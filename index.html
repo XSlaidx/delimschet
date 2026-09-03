@@ -145,7 +145,7 @@ input[type=number]{appearance:textfield}
     <label>Описание</label>
     <input type="text" id="e-desc" placeholder="Напр: ужин / такси / подарок">
     <label>Сумма</label>
-    <input type="number" id="e-amt" placeholder="0" min="0" step="0.01" oninput="onAmtChange()">
+    <input type="number" inputmode="decimal" id="e-amt" placeholder="0" min="0" step="0.01" oninput="onAmtChange()">
     <label>Кто заплатил</label>
     <select id="e-payer"></select>
     <label>Режим</label>
@@ -211,7 +211,7 @@ input[type=number]{appearance:textfield}
     <label>На что</label>
     <input type="text" id="c-title" placeholder="Напр: подарок">
     <label>Сумма</label>
-    <input type="number" id="c-amt" placeholder="0" min="0" step="0.01">
+    <input type="number" inputmode="decimal" id="c-amt" placeholder="0" min="0" step="0.01">
     <button class="btn" onclick="createColl()">Начать сбор</button>
   </div>
   <div id="coll-list"></div>
@@ -365,7 +365,12 @@ function haptic(){tg?.HapticFeedback?.impactOccurred('light')}
 function ok(){tg?.HapticFeedback?.notificationOccurred?.('success')}
 function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.createIcons();if(firstRun)showCurPicker()});
-function go(t,el){haptic();document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
+function go(t,el){
+  haptic();
+  window.scrollTo(0,0);
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')
+}
 
 /* ─── КОМНАТА / ПРИГЛАШЕНИЕ ─── */
 const BOT_USERNAME = "delimschet_bot"
@@ -377,7 +382,7 @@ function inviteRoom(){
   else{navigator.clipboard?.writeText(url+'\n'+msg);toast('Ссылка скопирована')}
 }
 function copyRoomId(){haptic();navigator.clipboard?.writeText(getDeepLink());toast('Ссылка скопирована')}
-function getRoomUrl(){return window.location.origin+window.location.pathname+'?room='+S.roomId}
+function getRoomUrl(){return getDeepLink()}
 
 /* ─── УЧАСТНИКИ ─── */
 function pName(id){const p=S.parts.find(x=>x.id===id);return p?p.name:id}
@@ -412,7 +417,7 @@ function renderShareInputs(){
   const n=parts.length;const def=Math.round(amt/n*100)/100;const rem=Math.round((amt-def*(n-1))*100)/100;
   box.innerHTML=parts.map((id,i)=>{
     const v=i<n-1?def:rem;
-    return `<div class="split-row"><span class="slbl">${esc(pName(id))}</span><input type="number" class="sinput" value="${v.toFixed(2)}" min="0" step="0.01" oninput="onShareChange()" data-idx="${i}"></div>`
+    return `<div class="split-row"><span class="slbl">${esc(pName(id))}</span><input type="number" inputmode="decimal" class="sinput" value="${v.toFixed(2)}" min="0" step="0.01" oninput="onShareChange()" data-idx="${i}"></div>`
   }).join('');updateShareSum()
 }
 function onShareChange(){haptic();updateShareSum()}
@@ -516,7 +521,7 @@ function setPMode(m){haptic();pMode=m;$('mode-plain').classList.toggle('on',m===
 function addPOpt(v='',price=''){
   const d=document.createElement('div');d.style.display='flex';d.style.gap='7px';d.style.marginBottom='7px';
   d.innerHTML=`<input type="text" placeholder="Вариант" value="${esc(v)}" style="flex:2">
-    <input type="number" placeholder="${pMode==='fund'?'Цена':'0'}" value="${price}" min="0" step="0.01" style="flex:1;width:80px;${pMode==='fund'?'':'display:none'}">
+    <input type="number" inputmode="decimal" placeholder="${pMode==='fund'?'Цена':'0'}" value="${price}" min="0" step="0.01" style="flex:1;width:80px;${pMode==='fund'?'':'display:none'}">
     <button class="icobtn" style="flex:0" onclick="this.parentElement.remove()"><i data-lucide="x" style="width:15px;height:15px"></i></button>`;
   $('p-opts').appendChild(d);if(window.lucide)lucide.createIcons()
 }
