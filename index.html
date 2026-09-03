@@ -6,7 +6,7 @@
 <title>Делим Счёт — Telegram Mini App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
 <style>
 :root{--bg:var(--tg-theme-bg-color,#0e1621);--bg2:var(--tg-theme-secondary-bg-color,#17212b);--txt:var(--tg-theme-text-color,#f5f5f5);--hint:var(--tg-theme-hint-color,#7d8b99);--btn:var(--tg-theme-button-color,#2ea6ff);--border:rgba(255,255,255,.07);--gold:#f5ba3c;--green:#4ade80;--red:#f87171}
@@ -257,7 +257,9 @@ input[type=number]{appearance:textfield}
 </div>
 
 <!-- FAB -->
-<button class="fab" onclick="openSheet()" title="Добавить"><i data-lucide="plus"></i></button>
+<button class="fab" onclick="openSheet()" title="Добавить" aria-label="Добавить">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+</button>
 
 <nav class="botnav">
   <button class="nav on" onclick="go('spend',this)"><i data-lucide="wallet"></i>Траты</button>
@@ -951,4 +953,13 @@ setTimeout(()=>{syncPull();subscribeRoom()},900);
 </div>
 
 </body>
+<script>
+// Гарантируем отрисовку иконок даже если lucide загрузился после DOMContentLoaded
+function _drawIcons(){if(window.lucide)try{lucide.createIcons()}catch(e){}}
+window.addEventListener('load',_drawIcons);
+if(document.readyState==='complete')_drawIcons();
+// повтор через тик, чтобы перехватить позднюю загрузку CDN
+setTimeout(_drawIcons,500);
+setTimeout(_drawIcons,1500);
+</script>
 </html>
