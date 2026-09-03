@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ДелимСчёт — Telegram Mini App</title>
+<title>Делим Счёт — Telegram Mini App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
@@ -116,7 +116,7 @@ input[type=number]{appearance:textfield}
 <div id="toast" class="toast"><span id="tt">Готово</span></div>
 
 <header>
-  <div class="brand"><span class="ic">💰</span>ДелимСчёт<span class="badge">ROOM</span></div>
+  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge">ROOM</span></div>
   <div class="head-acts">
     <span class="room-tag" id="room-tag" onclick="copyRoomId()">📋 комната</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
@@ -440,7 +440,7 @@ const BOT_USERNAME = "delimschet_bot"
 const APP_SHORT_NAME = "app"
 function getDeepLink(){return `https://t.me/${BOT_USERNAME}/${APP_SHORT_NAME}?startapp=${encodeURIComponent(S.roomId)}`}
 function inviteRoom(){
-  haptic();const url=getDeepLink();const msg='💰 Присоединяйся к ДелимСчёт! Комната: '+S.roomId;
+  haptic();const url=getDeepLink();const msg='💰 Присоединяйся к «Делим Счёт»! Комната: '+S.roomId;
   if(tg&&tg.openTelegramLink){tg.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(msg));ok()}
   else{navigator.clipboard?.writeText(url+'\n'+msg);toast('Ссылка скопирована')}
 }
@@ -579,7 +579,7 @@ function payDebt(fromId,toId,amt){
 }
 function copyDebts(){
   haptic();const t=settle();
-  let txt='🧾 *ДелимСчёт — долги*\n*Комната:* '+S.roomId+'\n\n';
+  let txt='🧾 *«Делим Счёт» — долги*\n*Комната:* '+S.roomId+'\n\n';
   S.expenses.forEach(e=>{txt+=`• ${e.desc}: ${fmt(e.amt)} (${pName(e.payer)})\n`});
   txt+='\n*Переводы:*\n';if(!t.length)txt+='Все в расчёте ✅\n';else t.forEach(x=>{txt+=`• ${pName(x.from)} → ${pName(x.to)}: ${fmt(x.amt)}\n`});
   txt+='\nОткрыть: '+getDeepLink();
