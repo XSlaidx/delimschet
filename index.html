@@ -105,10 +105,16 @@ input[type=number]{appearance:textfield}
 .room-dot.live{background:var(--green)}
 .room-title{font-weight:600;font-size:.9rem}
 .room-id{margin-left:auto;font-size:.7rem;color:var(--hint)}
+.room-act{margin-left:6px;padding:2px 6px;cursor:pointer;font-size:1rem;opacity:.7}
+.room-act:hover{opacity:1}
+.room-item.arch{opacity:.55}
 .quick-add{margin-top:12px}
 .qa-label{font-size:.72rem;color:var(--hint);margin-bottom:6px}
 .qa-row{display:flex;gap:6px;flex-wrap:wrap}
 .qa-chip{display:inline-flex;align-items:center;background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.3);color:var(--btn);font-size:.78rem;font-weight:600;padding:5px 10px;border-radius:12px;cursor:pointer}
+.ms-item{flex:1;min-width:90px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:11px;padding:9px 11px}
+.ms-v{font-size:1.05rem;font-weight:800;color:var(--foreground)}
+.ms-l{font-size:.68rem;color:var(--hint);margin-top:2px}
 .room-name-tag{font-size:.7rem;font-weight:700;color:var(--foreground);background:rgba(255,255,255,.08);padding:3px 8px;border-radius:12px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .cur-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
 .cur-grid .chip{display:flex;align-items:center;justify-content:center;font-size:1.2rem;padding:12px;min-height:50px}
@@ -200,9 +206,14 @@ input[type=number]{appearance:textfield}
       </button>
     </div>
     <div id="quick-add" class="quick-add" style="display:none"></div>
-  </div>
+    </div>
 
-  <div class="card">
+    <div class="card" id="my-summary-card">
+      <h3><i data-lucide="user-check" style="color:#4ade80"></i> Мой итог</h3>
+      <div id="my-summary" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    </div>
+
+    <div class="card">
     <h3 style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center"><i data-lucide="receipt" style="color:#f5ba3c"></i> Траты</span><span class="pill open" id="spent-total">0</span></h3>
     <div id="exp-list"></div>
   </div>
@@ -465,16 +476,41 @@ function createNewRoom(){
 }
 function openRooms(){
   const list=$('rooms-list');
-  const ids=Object.keys(ROOMS.rooms).sort((a,b)=>(ROOMS.meta[b]?.date||0)-(ROOMS.meta[a]?.date||0));
-  list.innerHTML=ids.map(id=>{
-    const m=ROOMS.meta[id]||{};const cur=id===S.roomId;
-    return `<div class="room-item ${cur?'on':''}" onclick="switchRoom('${id}')">
-      <span class="room-dot ${cur?'live':''}"></span>
-      <span class="room-title">${esc(m.name||'Общая касса')}</span>
-      <span class="room-id">${esc(id.slice(0,8))}…</span>
-    </div>`;
-  }).join('')||'<div class="empty">Нет касс</div>';
+  const all=Object.keys(ROOMS.rooms);
+  const active=all.filter(id=>!ROOMS.rooms[id].archived).sort((a,b)=>(ROOMS.meta[b]?.date||0)-(ROOMS.meta[a]?.date||0));
+  const arch=all.filter(id=>ROOMS.rooms[id].archived).sort((a,b)=>(ROOMS.meta[b]?.date||0)-(ROOMS.meta[a]?.date||0));
+  let html=active.map(id=>roomRow(id,false)).join('')||'<div class="empty">Нет активных касс</div>';
+  if(arch.length)html+='<div class="qa-label" style="margin-top:14px">В архиве</div>'+arch.map(id=>roomRow(id,true)).join('');
+  list.innerHTML=html;
   $('rooms-overlay').style.display='flex';
+}
+function roomRow(id,isArch){
+  const m=ROOMS.meta[id]||{};const cur=id===S.roomId;
+  const act=isArch
+    ? `<span class="room-act" onclick="event.stopPropagation();restoreRoom('${id}')">♻︎</span>`
+    : `<span class="room-act" onclick="event.stopPropagation();archiveRoom('${id}')">🗄</span>`;
+  return `<div class="room-item ${cur?'on':''} ${isArch?'arch':''}" onclick="switchRoom('${id}')">
+    <span class="room-dot ${cur?'live':''}"></span>
+    <span class="room-title">${esc(m.name||'Общая касса')}</span>
+    <span class="room-id">${esc(id.slice(0,8))}…</span>
+    ${act}</div>`;
+}
+function archiveRoom(id){
+  if(!ROOMS.rooms[id])return;
+  confirmBox('Закрыть кассу в архив? Изменения будут заморожены.',()=>{
+    ROOMS.rooms[id].archived=true;
+    localStorage.setItem(ROOMS_KEY,JSON.stringify(ROOMS));
+    toast('Касса в архиве');
+    if(id===S.roomId){const nxt=Object.keys(ROOMS.rooms).find(x=>!ROOMS.rooms[x].archived);if(nxt){switchRoom(nxt)}else{const nid2=genRoomId();const st=newState(nid2,'Общая касса');ROOMS.current=nid2;ROOMS.rooms[nid2]=st;ROOMS.meta[nid2]={name:'Общая касса',date:Date.now()};S=st;save();renderAll()}}
+    $('rooms-overlay').style.display='none';
+  });
+}
+function restoreRoom(id){
+  if(!ROOMS.rooms[id])return;
+  ROOMS.rooms[id].archived=false;
+  localStorage.setItem(ROOMS_KEY,JSON.stringify(ROOMS));
+  toast('Касса восстановлена');
+  openRooms();
 }
 function renameRoomNow(){
   const v=$('rename-room-input').value.trim();
@@ -587,7 +623,7 @@ function pMe(id){return id===myId}
 function renderParts(){
   $('parts').innerHTML=S.parts.length?S.parts.map(p=>`<span class="person on">
     ${p.photo?`<img class="av" src="${esc(p.photo)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:`<span class="av-init">${esc((p.name||'?').trim()[0]||'?')}</span>`}
-    <span onclick="renamePart('${p.id}')" style="cursor:text;">${esc(p.name)}</span>${p.me?' <b style="color:var(--btn)">· вы</b>':''} <span onclick="delPart('${p.id}')" style="margin-left:4px; padding-left:4px; border-left:1px solid var(--border); cursor:pointer;">✕</span></span>`).join('')||'':'<div class="empty">Добавьте участников</div>';
+    <span onclick="openPartProfile('${p.id}')" style="cursor:text;">${esc(p.name)}</span>${p.me?' <b style="color:var(--btn)">· вы</b>':''} <span onclick="delPart('${p.id}')" style="margin-left:4px; padding-left:4px; border-left:1px solid var(--border); cursor:pointer;">✕</span></span>`).join('')||'':'<div class="empty">Добавьте участников</div>';
   $('e-payer').innerHTML=S.parts.map(p=>`<option value="${p.id}">${esc(p.name)}${p.me?' (вы)':''}</option>`).join('');
   $('e-for').innerHTML=S.parts.map(p=>`<span class="person on" data-i="${p.id}" onclick="toggleFor(this,'${p.id}')">${esc(p.name)}</span>`).join('');
   renderShareInputs();
@@ -692,6 +728,18 @@ function calcBalances(){
     else{const sh=e.amt/ids.length;bal[e.payer]+=e.amt;ids.forEach(id=>bal[id]-=sh)}
   });return bal
 }
+function renderMySummary(){
+  const box=$('my-summary');if(!box)return;
+  if(!S.expenses.length){box.innerHTML='<div class="empty" style="padding:4px 0">Пока нет трат</div>';return;}
+  const b=calcBalances();
+  const paid=S.expenses.filter(e=>e.payer===myId).reduce((s,e)=>s+(+e.amt||0),0);
+  const mine=(b[myId]||0);
+  const sign=mine>=0?'+':'';
+  box.innerHTML=`
+    <div class="ms-item"><div class="ms-v">${fmt(paid)}</div><div class="ms-l">Оплатил за всех</div></div>
+    <div class="ms-item"><div class="ms-v">${fmt(Math.max(0,mine))}</div><div class="ms-l">Моя доля</div></div>
+    <div class="ms-item"><div class="ms-v" style="color:${mine>=0?'var(--green)':'var(--red)'}">${sign}${fmt(mine)}</div><div class="ms-l">${mine>=0?'вам должны':'вы должны'}</div></div>`;
+}
 function renderBalances(){
   const b=calcBalances();
   $('balances').innerHTML=S.parts.map(p=>{
@@ -714,8 +762,10 @@ function renderTransfers(){
   if(!t.length){box.innerHTML='<div class="empty" style="color:var(--green)">✅ Все в расчёте</div>';return}
   box.innerHTML=t.map(x=>{
     const isMe=x.from===myId||x.to===myId;
+    const payBtn=S.parts.find(p=>p.id===x.to)?.pay?`<button class="icobtn" style="color:var(--btn)" title="Скопировать реквизиты ${esc(pName(x.to))}" onclick="copyPay('${x.to}')"><i data-lucide="credit-card" style="width:18px;height:18px"></i></button>`:'';
     return `<div class="debt-row ${isMe?'me':''}"><span style="font-weight:600">${esc(pName(x.from))}</span><span class="arrow">→</span><span style="font-weight:600">${esc(pName(x.to))}</span><span class="sum">${fmt(x.amt)}</span>
-      <button class="icobtn" style="color:var(--green)" title="Отдал(а) долг" onclick="payDebt('${x.from}','${x.to}',${x.amt})"><i data-lucide="check-circle-2" style="width:18px;height:18px"></i></button></div>`
+      ${payBtn}
+      <button class="icobtn" style="color:var(--green)" title="Отдал(а) долг" onclick="payDebt('${x.from}','${x.to}',${x.amt})"><i data-lucide="check-circle-2" style="width:18px;height:18px"></i></button></div>`;
   }).join('')
 }
 function payDebt(fromId,toId,amt){
@@ -893,6 +943,7 @@ function confirmBox(msg,cb){
 function renderAll(){
   renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
   renderQuickAdd();
+  renderMySummary();
   if(window.lucide)lucide.createIcons();
 }
 /* ─── ПЕРЕИМЕНОВАНИЕ ─── */
@@ -908,6 +959,32 @@ function renamePart(id){
     $('rename-overlay').style.display='none';
   };
 }
+let _partEditId=null;
+function openPartProfile(id){
+  haptic();
+  const p=S.parts.find(x=>x.id===id);
+  if(!p)return;
+  _partEditId=id;
+  $('part-name-input').value=p.name||'';
+  $('part-pay-input').value=p.pay||'';
+  $('part-overlay').style.display='flex';
+  setTimeout(()=>{$('part-name-input').focus()},100);
+}
+function savePartProfile(){
+  const p=S.parts.find(x=>x.id===_partEditId);
+  if(!p)return;
+  const nm=$('part-name-input').value.trim();
+  if(nm)p.name=nm;
+  p.pay=$('part-pay-input').value.trim();
+  $('part-overlay').style.display='none';
+  save();renderAll();toast('Профиль сохранён');
+}
+function copyPay(id){
+  const p=S.parts.find(x=>x.id===id);
+  if(!p||!p.pay){toast('Нет реквизитов');return;}
+  navigator.clipboard?.writeText(p.pay);
+  toast('Реквизиты скопированы');
+}
 
 /* init */
 save();renderAll();
@@ -921,6 +998,21 @@ setTimeout(()=>{syncPull();subscribeRoom()},900);
     <div style="display:flex; gap:8px;">
       <button class="btn ghost" onclick="$('rename-overlay').style.display='none'">Отмена</button>
       <button class="btn" id="rename-save-btn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ОВЕРЛЕЙ ПРОФИЛЬ УЧАСТНИКА -->
+<div id="part-overlay" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h3><i data-lucide="user" style="color:var(--btn)"></i> Профиль участника</h3>
+    <label>Имя</label>
+    <input type="text" id="part-name-input" placeholder="Имя" style="margin-bottom:10px;">
+    <label>Реквизиты для перевода</label>
+    <input type="text" id="part-pay-input" placeholder="Номер карты / IBAN / телефон" style="margin-bottom:12px;">
+    <div style="display:flex;gap:8px;">
+      <button class="btn ghost" onclick="$('part-overlay').style.display='none'">Отмена</button>
+      <button class="btn" onclick="savePartProfile()">Сохранить</button>
     </div>
   </div>
 </div>
