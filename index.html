@@ -176,9 +176,11 @@ input[type=number]{appearance:textfield}
   <div class="card">
     <h3><i data-lucide="users" style="color:#2ea6ff"></i> Участники комнаты</h3>
     <div class="people-grid" id="parts"></div>
-    <div style="display:flex; gap:7px; margin-top:12px; align-items:center;">
-      <input type="text" id="new-part" placeholder="Имя участника..." style="margin:0; flex:1;" onkeydown="if(event.key==='Enter')addPart()">
-      <button class="btn ghost" onclick="addPart()" style="margin:0; padding:10px 14px; flex:0 0 auto;"><i data-lucide="plus" style="width:18px;height:18px"></i></button>
+    <div style="display: flex; gap: 8px; margin-top: 12px; align-items: stretch;">
+      <input type="text" id="new-part" placeholder="Имя участника..." style="margin: 0; flex: 1; min-width: 0;" onkeydown="if(event.key==='Enter')addPart()">
+      <button class="btn ghost" onclick="addPart()" style="margin: 0; width: 44px; padding: 0; flex-shrink: 0; display: flex; justify-content: center; align-items: center;">
+        <i data-lucide="plus" style="width:20px;height:20px;"></i>
+      </button>
     </div>
   </div>
 
