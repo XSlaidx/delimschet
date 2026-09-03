@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ДелимСчёт — Telegram Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+:root{--bg:var(--tg-theme-bg-color,#0e1621);--bg2:var(--tg-theme-secondary-bg-color,#17212b);--txt:var(--tg-theme-text-color,#f5f5f5);--hint:var(--tg-theme-hint-color,#7d8b99);--btn:var(--tg-theme-button-color,#2ea6ff);--border:rgba(255,255,255,.07);--gold:#f5ba3c;--green:#4ade80;--red:#f87171;--purple:#a78bfa}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;padding-bottom:80px}
+header{background:var(--bg2);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:1.1rem}
+.brand .ic{background:linear-gradient(135deg,#f5ba3c,#f97316);width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.badge{background:linear-gradient(135deg,#4ade80,#2ea6ff);color:#0e1621;font-size:.6rem;font-weight:800;padding:3px 7px;border-radius:20px;letter-spacing:.4px}
+.container{padding:14px;max-width:580px;margin:0 auto;width:100%}
+.tab{display:none;animation:fi .2s ease-out}
+.tab.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1}}
+.card{background:var(--bg2);border-radius:16px;padding:15px;margin-bottom:14px;border:1px solid var(--border)}
+.card h3{font-size:.95rem;margin-bottom:3px;display:flex;gap:8px;align-items:center}
+.sub{font-size:.78rem;color:var(--hint);margin-bottom:11px;line-height:1.45}
+label{display:block;font-size:.7rem;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.4px;margin:11px 0 5px}
+input[type=text],input[type=number],select{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:11px;padding:11px;color:var(--txt);font-family:inherit;font-size:.92rem;outline:none}
+input:focus,select:focus{border-color:var(--btn)}
+.row{display:flex;gap:7px;flex-wrap:wrap}
+.chip{background:rgba(0,0,0,.25);border:1px solid var(--border);color:var(--hint);padding:8px 11px;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer}
+.chip.on{background:rgba(46,166,255,.15);border-color:var(--btn);color:var(--btn)}
+.btn{width:100%;background:linear-gradient(135deg,#2ea6ff,#4f7cff);color:#fff;border:none;border-radius:12px;padding:12px;font-size:.95rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(46,166,255,.22);margin-top:6px}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:rgba(255,255,255,.07);box-shadow:none;border:1px solid var(--border);font-size:.82rem;padding:9px;margin-top:0}
+.btn.gold{background:linear-gradient(135deg,#f5ba3c,#f97316);box-shadow:0 4px 14px rgba(245,186,60,.25)}
+.btn.green{background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 4px 14px rgba(34,197,94,.2)}
+.exp-item{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.exp-item .txt{flex:1;min-width:0}
+.exp-item .t{font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-item .m{font-size:.72rem;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-item .amt{font-weight:800;color:var(--gold);white-space:nowrap}
+.icobtn{background:none;border:none;color:var(--hint);cursor:pointer;padding:5px;border-radius:8px;display:flex}
+.icobtn:hover{background:rgba(255,255,255,.08);color:var(--red)}
+.icobtn.blue:hover{color:var(--btn)}
+.bar-bg{background:rgba(0,0,0,.4);border-radius:8px;height:16px;overflow:hidden;margin:8px 0}
+.bar{height:100%;background:linear-gradient(90deg,#f5ba3c,#f97316);border-radius:8px;transition:width .4s;min-width:2px}
+.people-grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.person{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:.8rem;display:flex;align-items:center;gap:7px;cursor:pointer}
+.person.on{border-color:var(--btn);background:rgba(46,166,255,.12);color:var(--btn)}
+.person.paid{border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.1);color:var(--green)}
+.debt-row{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:11px;padding:9px 11px;margin-bottom:7px;font-size:.86rem}
+.debt-row .arrow{color:var(--btn)}
+.debt-row .sum{margin-left:auto;font-weight:800;color:var(--green)}
+.bal{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.85rem}
+.bal .bar2{flex:1;height:8px;border-radius:5px;background:rgba(0,0,0,.4);overflow:hidden}
+.bal .bar2>div{height:100%;border-radius:5px}
+.bal .neg>div{background:var(--red);float:right}
+.bal .pos>div{background:var(--green)}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px}
+.pill.open{background:rgba(46,166,255,.13);color:var(--btn)}
+.pill.done{background:rgba(74,222,128,.13);color:var(--green)}
+.poll-opt{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:11px;padding:9px 11px;margin-bottom:7px;cursor:pointer;position:relative;overflow:hidden}
+.poll-opt .fill{position:absolute;inset:0;background:rgba(46,166,255,.1);width:0;transition:width .4s;pointer-events:none}
+.poll-opt .lbl{position:relative;z-index:1;font-size:.88rem;font-weight:600;display:flex;align-items:center;gap:8px;flex:1}
+.poll-opt .pct{position:relative;z-index:1;font-weight:800;color:var(--btn);font-size:.82rem}
+.poll-opt.win .lbl{color:var(--green)}
+.empty{text-align:center;padding:22px 12px;color:var(--hint);font-size:.85rem;line-height:1.5}
+.botnav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:100;padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+.nav{flex:1;background:none;border:none;color:var(--hint);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.6rem;font-weight:700;cursor:pointer;padding:3px 0}
+.nav.on{color:var(--btn)}
+.nav i{width:20px;height:20px}
+.toast{position:fixed;top:62px;left:50%;transform:translateX(-50%) translateY(-18px);background:#2ea043;color:#fff;padding:10px 18px;border-radius:30px;font-size:.84rem;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:.3s;z-index:200}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.dl{display:flex;flex-wrap:wrap;gap:8px}
+.dl .btn.ghost{flex:1}
+input[type=number]{appearance:textfield}
+</style>
+</head>
+<body>
+<div id="toast" class="toast" id="toast"><span id="tt">Готово</span></div>
+
+<header>
+  <div class="brand"><span class="ic">💰</span>ДелимСчёт<span class="badge">VOTE+SPLIT</span></div>
+  <div style="display:flex;align-items:center;gap:7px">
+    <span class="chip" style="font-size:.72rem;padding:4px 9px" id="cur-chip" onclick="cycleCur()">₽</span>
+    <button class="icobtn blue" onclick="shareSummary()" title="Поделиться итогом"><i data-lucide="share-2" style="width:19px;height:19px"></i></button>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ═══════ ТАБ 1: УЧАСТНИКИ + ТРАТЫ ═══════ -->
+<div id="tab-spend" class="tab active">
+  <div class="card">
+    <h3><i data-lucide="users" style="color:#2ea6ff"></i> Участники группы</h3>
+    <div class="sub">С ними делите траты и собираете деньги. Чип = участник.</div>
+    <div class="people-grid" id="parts"></div>
+    <div style="display:flex;gap:7px;margin-top:9px">
+      <input type="text" id="new-part" placeholder="Имя участника…" style="flex:1" onkeydown="if(event.key==='Enter')addPart()">
+      <button class="btn ghost" onclick="addPart()" style="flex:0 0 auto;padding:0 14px">＋</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><i data-lucide="wallet" style="color:#4ade80"></i> Новая трата</h3>
+    <div class="sub">Кто заплатил → остальные делят. Можно выбрать «для кого» чипами.</div>
+    <label>Описание</label>
+    <input type="text" id="e-desc" placeholder="Напр: ужин в кафе / подарок Бекежу">
+    <label>Сумма</label>
+    <input type="number" id="e-amt" placeholder="0" min="0" step="0.01">
+    <label>Кто заплатил</label>
+    <select id="e-payer"></select>
+    <label>Делим между (пусто = все поровну)</label>
+    <div class="people-grid" id="e-for"></div>
+    <button class="btn" onclick="addExpense()"><i data-lucide="plus" style="width:16px;height:16px"></i> Добавить трату</button>
+  </div>
+
+  <div class="card">
+    <h3 style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center"><i data-lucide="receipt" style="color:#f5ba3c"></i> Траты</span><span class="pill open" id="spent-total">0</span></h3>
+    <div id="exp-list"></div>
+  </div>
+</div>
+
+<!-- ═══════ ТАБ 2: РАСЧЁТ ДОЛГОВ ═══════ -->
+<div id="tab-debt" class="tab">
+  <div class="card">
+    <h3><i data-lucide="scale" style="color:#a78bfa"></i> Баланс участников</h3>
+    <div class="sub">Минус — должен, плюс — ему должны. Клик по имени участника — исключить из расчёта.</div>
+    <div id="balances"></div>
+  </div>
+  <div class="card">
+    <h3><i data-lucide="arrows-left-right" style="color:#4ade80"></i> Минимальные переводы</h3>
+    <div class="sub">Алгоритм закрывает все долги наименьшим числом переводов.</div>
+    <div id="transfers"></div>
+  </div>
+  <button class="btn gold" onclick="copyDebts()"><i data-lucide="copy" style="width:16px;height:16px"></i> Скопировать долги в чат</button>
+</div>
+
+<!-- ═══════ ТАБ 3: ОПРОСЫ ═══════ -->
+<div id="tab-poll" class="tab">
+  <div class="card">
+    <h3><i data-lucide="vote" style="color:#2ea6ff"></i> Создать опрос</h3>
+    <div class="sub">Режим «На что скидываемся»: у вариантов есть цена → победитель сразу превращается в сбор денег.</div>
+    <label>Вопрос</label>
+    <input type="text" id="p-q" placeholder="Напр: что дарим Бекежу на день рождения?">
+    <label>Режим</label>
+    <div class="row" style="margin-bottom:4px">
+      <span class="chip on" id="mode-plain" onclick="setPMode('plain')">🗳️ Обычное голосование</span>
+      <span class="chip" id="mode-fund" onclick="setPMode('fund')">💰 На что скидываемся</span>
+    </div>
+    <div id="p-fundhint" style="display:none" class="sub" style="margin-top:6px">У каждого варианта появится поле цены.</div>
+    <label>Варианты</label>
+    <div id="p-opts"></div>
+    <button class="btn ghost" onclick="addPOpt()" style="margin-bottom:8px"><i data-lucide="plus" style="width:15px;height:15px"></i> Вариант</button>
+    <button class="btn" onclick="createPoll()">Создать опрос</button>
+  </div>
+  <div id="poll-list"></div>
+</div>
+
+<!-- ═══════ ТАБ 4: СБОРЫ ═══════ -->
+<div id="tab-collect" class="tab">
+  <div class="card">
+    <h3><i data-lucide="piggy-bank" style="color:#f5ba3c"></i> Новый сбор</h3>
+    <div class="sub">Скидываемся равными долями. Каждый жмёт «Внёс» — прогресс виден всем.</div>
+    <label>На что собираем</label>
+    <input type="text" id="c-title" placeholder="Напр: подарок начальнику / поездка на озеро">
+    <label>Сумма цели</label>
+    <input type="number" id="c-amt" placeholder="0" min="0" step="0.01">
+    <button class="btn" onclick="createColl()">Начать сбор</button>
+  </div>
+  <div id="coll-list"></div>
+</div>
+
+</div>
+
+<nav class="botnav">
+  <button class="nav on" onclick="go('spend',this)"><i data-lucide="wallet"></i>Траты</button>
+  <button class="nav" onclick="go('debt',this)"><i data-lucide="scale"></i>Долги</button>
+  <button class="nav" onclick="go('poll',this)"><i data-lucide="vote"></i>Опросы</button>
+  <button class="nav" onclick="go('collect',this)"><i data-lucide="piggy-bank"></i>Сборы</button>
+</nav>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.()}
+const $=id=>document.getElementById(id);
+const CURS=['₽','₸','$','€','Br'];
+let S=null;
+try{S=JSON.parse(localStorage.getItem('delimschet_v1'))}catch(e){}
+if(!S||!S.parts)S={cur:'₽',parts:['Алекс','Бек','Жанна','Марат'],expenses:[],polls:[],colls:[]};
+let pMode='plain',myVotes={}; // pollId -> chosen option idx
+
+function save(){try{localStorage.setItem('delimschet_v1',JSON.stringify(S))}catch(e){}}
+function fmt(n){return (Math.round(n*100)/100).toLocaleString('ru-RU',{maximumFractionDigits:2})+' '+S.cur}
+function haptic(){tg?.HapticFeedback?.impactOccurred('light')}
+function ok(){tg?.HapticFeedback?.notificationOccurred?.('success')}
+function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
+document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.createIcons()});
+function cycleCur(){haptic();const i=CURS.indexOf(S.cur);S.cur=CURS[(i+1)%CURS.length];$('cur-chip').textContent=S.cur;save();renderAll()}
+
+function go(t,el){haptic();document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
+
+/* ─── УЧАСТНИКИ ─── */
+function renderParts(){
+  $('parts').innerHTML=S.parts.map((p,i)=>`<span class="person on" onclick="delPart(${i})">${esc(p)} ✕</span>`).join('')||'<div class="empty">Добавьте первого участника</div>';
+  $('e-payer').innerHTML=S.parts.map(p=>`<option>${esc(p)}</option>`).join('');
+  $('e-for').innerHTML=S.parts.map((p,i)=>`<span class="person on" data-i="${i}" onclick="toggleFor(this,${i})">${esc(p)}</span>`).join('');
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function addPart(){const v=$('new-part').value.trim();if(!v)return;if(S.parts.includes(v)){toast('Уже есть такой участник');return}S.parts.push(v);$('new-part').value='';save();renderAll();ok();toast('Участник добавлен')}
+function delPart(i){haptic();S.parts.splice(i,1);save();renderAll()}
+function toggleFor(el,i){el.classList.toggle('on');haptic()}
+function payerSel(){return $('e-payer').value||S.parts[0]||''}
+function forSel(){const sel=[...$('e-for').querySelectorAll('.person.on')].map(x=>+x.dataset.i);return sel.length===S.parts.length?[]:sel.map(i=>S.parts[i])} // [] = все
+
+/* ─── ТРАТЫ ─── */
+function addExpense(){
+  const desc=$('e-desc').value.trim(),amt=parseFloat($('e-amt').value),payer=payerSel();
+  if(!desc||!amt||amt<=0){toast('Заполните описание и сумму');return}
+  if(!S.parts.length){toast('Сначала добавьте участников');return}
+  if(!S.parts.includes(payer)){toast('Плательщик не участник');return}
+  S.expenses.push({id:Date.now(),desc,amt,payer,for:forSel()});
+  $('e-desc').value='';$('e-amt').value='';
+  save();renderAll();ok();toast('Трата добавлена');
+}
+function delExp(id){haptic();S.expenses=S.expenses.filter(e=>e.id!==id);save();renderAll()}
+function renderExp(){
+  const box=$('exp-list'),tot=S.expenses.reduce((a,e)=>a+e.amt,0);
+  $('spent-total').textContent=fmt(tot);
+  if(!S.expenses.length){box.innerHTML='<div class="empty">Трат пока нет.<br>Добавьте первую — например, ужин или такси.</div>';return}
+  box.innerHTML=S.expenses.map(e=>{
+    const scope=e.for.length?e.for.join(', '):'все поровну';
+    return `<div class="exp-item">
+      <div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">${esc(e.payer)} заплатил(а) · ${esc(scope)}</div></div>
+      <div class="amt">${fmt(e.amt)}</div>
+      <button class="icobtn" onclick="delExp(${e.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button>
+    </div>`}).join('');
+  if(window.lucide)lucide.createIcons();
+}
+
+/* ─── ДОЛГИ ─── */
+function calcBalances(){
+  const bal={};S.parts.forEach(p=>bal[p]=0);
+  S.expenses.forEach(e=>{
+    if(!(e.payer in bal))return;
+    const who=e.for.length?S.parts.filter(p=>e.for.includes(p)):S.parts;
+    const sharers=who.filter(p=>p in bal);
+    if(!sharers.length)return;
+    const sh=e.amt/sharers.length;
+    bal[e.payer]+=e.amt;
+    sharers.forEach(p=>bal[p]-=sh);
+  });
+  return bal;
+}
+function renderBalances(){
+  const b=calcBalances();
+  $('balances').innerHTML=S.parts.map(p=>{
+    const v=b[p];const cls=v>=0?'pos':'neg';const w=Math.min(100,Math.abs(v));
+    return `<div class="bal"><span style="width:74px;font-weight:600;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p)}</span>
+      <div class="bar2 ${cls}"><div style="width:${Math.max(3,w/50*100)}%"></div></div>
+      <span style="width:104px;text-align:right;font-weight:800;color:${v>=0?'var(--green)':'var(--red)'}">${v>=0?'+':''}${fmt(v)}</span></div>`;
+  }).join('')||'<div class="empty">Нет участников</div>';
+}
+function settle(){
+  const bal=calcBalances();
+  const neg=S.parts.filter(p=>bal[p]<-0.005).map(p=>({p,v:-bal[p]})).sort((a,b)=>b.v-a.v);
+  const pos=S.parts.filter(p=>bal[p]>0.005).map(p=>({p,v:bal[p]})).sort((a,b)=>b.v-a.v);
+  const out=[];
+  while(neg.length&&pos.length){
+    const d=Math.min(neg[0].v,pos[0].v);
+    if(d>0.004)out.push({from:neg[0].p,to:pos[0].p,amt:d});
+    neg[0].v-=d;pos[0].v-=d;
+    if(neg[0].v<0.005)neg.shift();
+    if(pos[0].v<0.005)pos.shift();
+  }
+  return out;
+}
+function renderTransfers(){
+  const t=settle();
+  const box=$('transfers');
+  if(!S.expenses.length){box.innerHTML='<div class="empty">Добавьте траты — здесь появятся переводы,<br>закрывающие долги.</div>';return}
+  if(!t.length){box.innerHTML='<div class="empty" style="color:var(--green)">✅ Все в расчёте, долгов нет</div>';return}
+  box.innerHTML=t.map(x=>`<div class="debt-row"><span style="font-weight:600">${esc(x.from)}</span><span class="arrow">→</span><span style="font-weight:600">${esc(x.to)}</span><span class="sum">${fmt(x.amt)}</span></div>`).join('');
+}
+function copyDebts(){
+  haptic();const t=settle();const b=calcBalances();
+  let txt='🧾 *ДелимСчёт — долги группы*\n\n';
+  S.expenses.forEach(e=>{txt+=`• ${e.desc}: ${fmt(e.amt)} (${e.payer})\n`});
+  txt+='\n*Кому перевести:*\n';
+  if(!t.length)txt+='Всем всё ясно, долгов нет ✅\n';
+  else t.forEach(x=>{txt+=`• ${x.from} → ${x.to}: ${fmt(x.amt)}\n`});
+  txt+='\nСделано в @delimschet_bot';
+  if(navigator.clipboard)navigator.clipboard.writeText(txt);
+  ok();toast('Долги скопированы в буфер');
+}
+
+/* ─── ОПРОСЫ ─── */
+function setPMode(m){haptic();pMode=m;$('mode-plain').classList.toggle('on',m==='plain');$('mode-fund').classList.toggle('on',m==='fund');$('p-fundhint').style.display=m==='fund'?'block':'none';$('p-fundhint').classList?.add('sub');}
+function addPOpt(v='',price=''){
+  const d=document.createElement('div');d.style.display='flex';d.style.gap='7px';d.style.marginBottom='7px';
+  d.innerHTML=`<input type="text" placeholder="Вариант (напр: часы)" value="${esc(v)}" style="flex:2">
+    <input type="number" placeholder="${pMode==='fund'?'Цена':'0'}" value="${price}" min="0" step="0.01" style="flex:1;${pMode==='fund'?'':'display:none'}">
+    <button class="icobtn" style="flex:0 0 auto" onclick="this.parentElement.remove()"><i data-lucide="x" style="width:15px;height:15px"></i></button>`;
+  $('p-opts').appendChild(d);if(window.lucide)lucide.createIcons();
+}
+function pollOptsPriceVis(){document.querySelectorAll('#p-opts > div input[type=number]').forEach(i=>{i.style.display=pMode==='fund'?'':'none'})}
+function createPoll(){
+  const q=$('p-q').value.trim();
+  const rows=[...$('p-opts').children].map(r=>{
+    const t=r.querySelector('input[type=text]').value.trim();
+    const pr=parseFloat(r.querySelector('input[type=number]').value)||0;
+    return {t,pr}
+  }).filter(x=>x.t);
+  if(!q||!rows.length){toast('Введите вопрос и хотя бы 2 варианта');return}
+  if(rows.length<2){toast('Нужно минимум 2 варианта');return}
+  if(pMode==='fund'&&rows.some(r=>!r.pr)){toast('Укажите цену для каждого варианта');return}
+  S.polls.unshift({id:Date.now(),q,mode:pMode,votes:rows.map(()=>0),opts:rows,total:0});
+  $('p-q').value='';$('p-opts').innerHTML='';
+  save();renderAll();ok();toast('Опрос создан');
+}
+function votePoll(id,oi){
+  haptic();const p=S.polls.find(x=>x.id===id);if(!p)return;
+  if(myVotes[id]===oi){myVotes[id]=undefined;p.votes[oi]--}
+  else{if(myVotes[id]!==undefined)p.votes[myVotes[id]]--;p.votes[oi]++;myVotes[id]=oi}
+  p.total=myVotes[id]===undefined?p.total:p.total+0; // noop keep
+  save();renderPolls();
+}
+function delPoll(id){haptic();S.polls=S.polls.filter(p=>p.id!==id);delete myVotes[id];save();renderPolls()}
+function pollToCollect(id){
+  haptic();const p=S.polls.find(x=>x.id===id);if(!p)return;
+  const wi=p.votes.indexOf(Math.max(...p.votes));
+  if(wi<0){toast('Пока нет голосов');return}
+  const opt=p.opts[wi];
+  if(!opt.pr){toast('У варианта-победителя нет цены');return}
+  S.colls.unshift({id:Date.now(),title:`${p.q} — ${opt.t}`,target:opt.pr,paid:{}});
+  save();renderAll();ok();toast('Сбор создан на '+fmt(opt.pr));
+}
+function renderPolls(){
+  const box=$('poll-list');
+  if(!S.polls.length){box.innerHTML='<div class="card"><div class="empty">Опросов нет.<br>Создайте «На что скидываемся» — победитель станет сбором.</div></div>';return}
+  box.innerHTML=S.polls.map(p=>{
+    const max=Math.max(...p.votes,1);
+    const winner=p.votes.indexOf(Math.max(...p.votes));
+    return `<div class="card"><h3 style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center">${p.mode==='fund'?'💰':'🗳️'} ${esc(p.q)}</span>
+      <button class="icobtn" onclick="delPoll(${p.id})"><i data-lucide="trash-2" style="width:15px;height:15px"></i></button></h3>
+      ${p.opts.map((o,i)=>{
+        const v=p.votes[i]||0,pc=Math.round(v/max*100);
+        return `<div class="poll-opt ${i===winner&&v>0?'win':''}" onclick="votePoll(${p.id},${i})">
+          <div class="fill" style="width:${pc}%"></div>
+          <div class="lbl"><span>${i===winner&&v>0?'👑':''} ${esc(o.t)}</span>${o.pr?`<span style="font-weight:700;color:var(--gold)">${fmt(o.pr)}</span>`:''}</div>
+          <div class="pct">${v>0?v+' · '+pc+'%':'—'}</div></div>`}).join('')}
+      <div style="display:flex;gap:7px;margin-top:9px;align-items:center">
+        <span class="pill open">Голосов: ${p.votes.reduce((a,b)=>a+b,0)}</span>
+        ${p.mode==='fund'&&p.votes.some(v=>v>0)?`<button class="btn ghost" style="flex:1" onclick="pollToCollect(${p.id})">💰 Собрать на победителя</button>`:''}
+        <span style="font-size:.68rem;color:var(--hint);margin-left:auto">клик = ваш голос</span>
+      </div></div>`}).join('');
+}
+
+/* ─── СБОРЫ ─── */
+function createColl(){
+  const t=$('c-title').value.trim(),a=parseFloat($('c-amt').value);
+  if(!t||!a||a<=0){toast('Заполните название и сумму');return}
+  if(!S.parts.length){toast('Сначала добавьте участников');return}
+  S.colls.unshift({id:Date.now(),title:t,target:a,paid:{}});
+  $('c-title').value='';$('c-amt').value='';
+  save();renderAll();ok();toast('Сбор начат');
+}
+function togglePaid(cid,p){
+  haptic();const c=S.colls.find(x=>x.id===cid);if(!c)return;
+  if(c.paid[p]){delete c.paid[p]}else{c.paid[p]=true}
+  save();renderAll();
+}
+function delColl(id){haptic();S.colls=S.colls.filter(c=>c.id!==id);save();renderAll()}
+function collToExpense(cid){
+  haptic();const c=S.colls.find(x=>x.id===cid);if(!c)return;
+  const payers=Object.keys(c.paid);
+  if(!payers.length){toast('Сначала отметьте, кто внёс');return}
+  const payer=payers[0];
+  S.expenses.push({id:Date.now(),desc:c.title,amt:c.target,payer,for:[]});
+  save();renderAll();ok();toast('Добавлено в траты: плательщик '+payer);
+}
+function renderColls(){
+  const box=$('coll-list');
+  if(!S.colls.length){box.innerHTML='<div class="card"><div class="empty">Сборов нет.<br>Клик «💰 Собрать на победителя» в опросе создаст его сам.</div></div>';return}
+  box.innerHTML=S.colls.map(c=>{
+    const paidAmt=Object.keys(c.paid).length*(c.target/Math.max(1,S.parts.length));
+    const pct=Math.min(100,Math.round(paidAmt/c.target*100));
+    const done=pct>=99.5;
+    return `<div class="card"><h3 style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center"><i data-lucide="piggy-bank" style="color:var(--gold)"></i> ${esc(c.title)}</span>
+      <span class="pill ${done?'done':'open'}">${done?'✅ закрыт':pct+'%'}</span></h3>
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--hint);margin-top:6px"><span>Собрано: <b style="color:var(--gold)">${fmt(paidAmt)}</b></span><span>Цель: ${fmt(c.target)}</span></div>
+      <div class="bar-bg"><div class="bar" style="width:${pct}%"></div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${S.parts.map(p=>{
+        const isPaid=!!c.paid[p];
+        return `<span class="person ${isPaid?'paid':''}" onclick="togglePaid(${c.id},'${esc(p)}')">${isPaid?'✓':'○'} ${esc(p)}${isPaid?' · '+fmt(c.target/Math.max(1,S.parts.length)):''}</span>`}).join('')}</div>
+      <div class="dl" style="margin-top:10px">
+        ${done?`<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense(${c.id})">→ В траты</button>`:''}
+        <button class="icobtn" style="margin-left:auto" onclick="delColl(${c.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button>
+      </div></div>`}).join('');
+}
+
+/* ─── ОБЩЕЕ ─── */
+function shareSummary(){
+  haptic();
+  const b=calcBalances(),t=settle();
+  let txt='💰 *ДелимСчёт — сводка группы*\n';
+  txt+=S.parts.map(p=>`👤 ${p}`).join(' · ')+'\n\n';
+  if(S.expenses.length){txt+='🧾 *Траты:*\n'+S.expenses.map(e=>`• ${e.desc}: ${fmt(e.amt)} (${e.payer})`).join('\n')+'\n\n'}
+  if(t.length){txt+='🔁 *Переводы:*\n'+t.map(x=>`• ${x.from} → ${x.to}: ${fmt(x.amt)}`).join('\n')+'\n\n'}
+  else if(S.expenses.length)txt+='🔁 Все в расчёте ✅\n\n';
+  if(S.colls.length){txt+='🐷 *Сборы:*\n'+S.colls.map(c=>{
+    const paid=Object.keys(c.paid).length*(c.target/Math.max(1,S.parts.length));
+    return `• ${c.title}: ${fmt(paid)}/${fmt(c.target)}`}).join('\n')+'\n\n'}
+  if(S.polls.length){txt+='🗳️ *Опросы:*\n'+S.polls.map(p=>`• ${p.q} (${p.votes.reduce((a,b)=>a+b,0)} гл.)`).join('\n')}
+  txt+='\n\nСделано в ДелимСчёт';
+  if(navigator.clipboard)navigator.clipboard.writeText(txt);
+  ok();toast('Сводка скопирована — вставьте в чат');
+}
+function renderAll(){
+  renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
+  if(window.lucide)lucide.createIcons();
+}
+/* init */
+renderAll();
+addPOpt('Часы');
+addPOpt('Кошелёк');
+</script>
+</body>
+</html>
