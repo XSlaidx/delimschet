@@ -328,6 +328,12 @@ async function syncPull(){
   }catch(e){}
 }
 function applyRemote(st){
+  // Не перерисовываем, если пользователь прямо сейчас печатает
+  const a=document.activeElement;
+  if(a&&(a.tagName==='INPUT'||a.tagName==='SELECT')){
+    setTimeout(()=>applyRemote(st),1500);
+    return;
+  }
   S=Object.assign({},S,st);normalize();_localStamp=Date.now();save();renderAll();
 }
 function subscribeRoom(){
@@ -362,12 +368,15 @@ document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.create
 function go(t,el){haptic();document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
 
 /* ─── КОМНАТА / ПРИГЛАШЕНИЕ ─── */
+const BOT_USERNAME = "delimschet_bot"
+const APP_SHORT_NAME = "app"
+function getDeepLink(){return `https://t.me/${BOT_USERNAME}/${APP_SHORT_NAME}?startapp=${encodeURIComponent(S.roomId)}`}
 function inviteRoom(){
-  haptic();const url=getRoomUrl();const msg='💰 Присоединяйся к ДелимСчёт! Комната: '+S.roomId;
+  haptic();const url=getDeepLink();const msg='💰 Присоединяйся к ДелимСчёт! Комната: '+S.roomId;
   if(tg&&tg.openTelegramLink){tg.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(msg));ok()}
   else{navigator.clipboard?.writeText(url+'\n'+msg);toast('Ссылка скопирована')}
 }
-function copyRoomId(){haptic();navigator.clipboard?.writeText(getRoomUrl());toast('Ссылка скопирована')}
+function copyRoomId(){haptic();navigator.clipboard?.writeText(getDeepLink());toast('Ссылка скопирована')}
 function getRoomUrl(){return window.location.origin+window.location.pathname+'?room='+S.roomId}
 
 /* ─── УЧАСТНИКИ ─── */
@@ -498,7 +507,7 @@ function copyDebts(){
   let txt='🧾 *ДелимСчёт — долги*\n*Комната:* '+S.roomId+'\n\n';
   S.expenses.forEach(e=>{txt+=`• ${e.desc}: ${fmt(e.amt)} (${pName(e.payer)})\n`});
   txt+='\n*Переводы:*\n';if(!t.length)txt+='Все в расчёте ✅\n';else t.forEach(x=>{txt+=`• ${pName(x.from)} → ${pName(x.to)}: ${fmt(x.amt)}\n`});
-  txt+='\nОткрыть: '+getRoomUrl();
+  txt+='\nОткрыть: '+getDeepLink();
   if(navigator.clipboard)navigator.clipboard.writeText(txt);ok();toast('Долги скопированы')
 }
 
