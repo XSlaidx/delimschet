@@ -365,11 +365,14 @@ function mergeState(a,b){
     (bd[k]||[]).forEach(id=>{if(!r.del[k].includes(id))r.del[k].push(id)});
     if(r.del[k].length>500)r.del[k]=r.del[k].slice(-500);
   });
-  function union(aa,bb,delArr){
-    const map={};aa.forEach(x=>map[x.id]=x);
-    const out=aa.slice();
-    (bb||[]).forEach(x=>{if(!map[x.id]){const c=JSON.parse(JSON.stringify(x));out.push(c);map[x.id]=c}});
-    return out.filter(x=>!delArr.includes(x.id));
+  function union(aa, bb, delArr) {
+    const map = {};
+    // 1. Сначала загружаем данные с сервера (remote)
+    (bb || []).forEach(x => { map[x.id] = JSON.parse(JSON.stringify(x)) });
+    // 2. Накатываем локальные данные поверх (local wins, чтобы не затереть то, что мы вводим прямо сейчас)
+    aa.forEach(x => { map[x.id] = Object.assign(map[x.id] || {}, x) });
+    // 3. Возвращаем как массив без удаленных
+    return Object.values(map).filter(x => !delArr.includes(x.id));
   }
   r.parts=union(a.parts,b.parts||[],r.del.part);
   r.expenses=union(a.expenses,b.expenses||[],r.del.exp);
@@ -454,9 +457,9 @@ function getRoomUrl(){return getDeepLink()}
 function pName(id){const p=S.parts.find(x=>x.id===id);return p?p.name:id}
 function pMe(id){return id===myId}
 function renderParts(){
-  $('parts').innerHTML=S.parts.length?S.parts.map(p=>`<span class="person on" onclick="delPart('${p.id}')">
+  $('parts').innerHTML=S.parts.length?S.parts.map(p=>`<span class="person on">
     ${p.photo?`<img class="av" src="${esc(p.photo)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:`<span class="av-init">${esc((p.name||'?').trim()[0]||'?')}</span>`}
-    ${esc(p.name)}${p.me?' <b style="color:var(--btn)">· вы</b>':''} ✕</span>`).join('')||'':'<div class="empty">Добавьте участников</div>';
+    <span onclick="renamePart('${p.id}')" style="cursor:text;">${esc(p.name)}</span>${p.me?' <b style="color:var(--btn)">· вы</b>':''} <span onclick="delPart('${p.id}')" style="margin-left:4px; padding-left:4px; border-left:1px solid var(--border); cursor:pointer;">✕</span></span>`).join('')||'':'<div class="empty">Добавьте участников</div>';
   $('e-payer').innerHTML=S.parts.map(p=>`<option value="${p.id}">${esc(p.name)}${p.me?' (вы)':''}</option>`).join('');
   $('e-for').innerHTML=S.parts.map(p=>`<span class="person on" data-i="${p.id}" onclick="toggleFor(this,'${p.id}')">${esc(p.name)}</span>`).join('');
   renderShareInputs();
@@ -466,8 +469,25 @@ function addPart(){const v=$('new-part').value.trim();if(!v)return;if(S.parts.so
 function delPart(id){
   haptic();
   if(pMe(id)){toast('Это вы — себя нельзя удалить');return}
+
+  // 1. ПРОВЕРКА НА ЗАВИСИМОСТИ (Участвует ли человек в деньгах?)
+  const involvedInExp=S.expenses.some(e=>
+    e.payer===id||
+    e.for.includes(id)||
+    (e.shares&&e.shares[id]!==undefined)
+  );
+  const involvedInColl=S.colls.some(c=>c.paid&&c.paid[id]);
+
+  if(involvedInExp||involvedInColl){
+    const msg="Нельзя удалить участника, который задействован в тратах или сборах. Сначала удалите связанные с ним чеки.";
+    if(tg&&tg.showAlert)tg.showAlert(msg);
+    else alert(msg);
+    return;
+  }
+
+  // 2. БЕЗОПАСНОЕ УДАЛЕНИЕ
   confirmBox('Удалить участника из комнаты?',()=>{
-    S.del.part.push(id);const idx=S.parts.findIndex(p=>p.id===id);if(idx>=0)S.parts.splice(idx,1);save();renderAll();toast('Участник удалён')
+    S.del.part.push(id);S.parts=S.parts.filter(p=>p.id!==id);save();renderAll();toast('Участник удалён')
   });
 }
 function toggleFor(el,i){el.classList.toggle('on');haptic();if(splitMode==='custom')renderShareInputs()}
@@ -741,9 +761,35 @@ function renderAll(){
   renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
   if(window.lucide)lucide.createIcons();
 }
+/* ─── ПЕРЕИМЕНОВАНИЕ ─── */
+function renamePart(id){
+  haptic();
+  const p=S.parts.find(x=>x.id===id);
+  if(!p)return;
+  $('rename-input').value=p.name;
+  $('rename-overlay').style.display='flex';
+  $('rename-save-btn').onclick=()=>{
+    const newName=$('rename-input').value.trim();
+    if(newName){p.name=newName;save();renderAll();toast('Имя изменено')}
+    $('rename-overlay').style.display='none';
+  };
+}
+
 /* init */
 save();renderAll();
 setTimeout(()=>{syncPull();subscribeRoom()},900);
 </script>
+<!-- ОВЕРЛЕЙ ПЕРЕИМЕНОВАНИЯ -->
+<div id="rename-overlay" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h3><i data-lucide="edit-2" style="color:var(--btn)"></i> Переименовать</h3>
+    <input type="text" id="rename-input" placeholder="Новое имя..." style="margin-bottom: 12px;">
+    <div style="display:flex; gap:8px;">
+      <button class="btn ghost" onclick="$('rename-overlay').style.display='none'">Отмена</button>
+      <button class="btn" id="rename-save-btn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
