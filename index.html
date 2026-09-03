@@ -94,6 +94,18 @@ input[type=number]{appearance:textfield}
 .overlay-box{background:var(--bg2);border-radius:18px;padding:22px;width:280px;border:1px solid var(--border)}
 .overlay-box h3{font-size:1rem;margin-bottom:4px;display:flex;gap:8px;align-items:center}
 .overlay-box .sub{font-size:.8rem;margin-bottom:14px}
+.rooms-list{display:flex;flex-direction:column;gap:7px;margin-bottom:6px;max-height:300px;overflow-y:auto}
+.room-item{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:11px;padding:10px 12px;cursor:pointer}
+.room-item.on{border-color:var(--btn);background:rgba(46,166,255,.08)}
+.room-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
+.room-dot.live{background:var(--green)}
+.room-title{font-weight:600;font-size:.9rem}
+.room-id{margin-left:auto;font-size:.7rem;color:var(--hint)}
+.quick-add{margin-top:12px}
+.qa-label{font-size:.72rem;color:var(--hint);margin-bottom:6px}
+.qa-row{display:flex;gap:6px;flex-wrap:wrap}
+.qa-chip{display:inline-flex;align-items:center;background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.3);color:var(--btn);font-size:.78rem;font-weight:600;padding:5px 10px;border-radius:12px;cursor:pointer}
+.room-name-tag{font-size:.7rem;font-weight:700;color:var(--foreground);background:rgba(255,255,255,.08);padding:3px 8px;border-radius:12px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .cur-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
 .cur-grid .chip{display:flex;align-items:center;justify-content:center;font-size:1.2rem;padding:12px;min-height:50px}
 /* FAB */
@@ -118,8 +130,10 @@ input[type=number]{appearance:textfield}
 <header>
   <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge">ROOM</span></div>
   <div class="head-acts">
-    <span class="room-tag" id="room-tag" onclick="copyRoomId()">📋 комната</span>
+    <span class="room-tag" id="room-tag" onclick="copyRoomId()">🚪 комната</span>
+    <span class="room-name-tag" id="room-name" onclick="openRenameRoom()">Общая касса</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
+    <button class="icobtn blue" onclick="openRooms()" title="Мои кассы"><i data-lucide="layers" style="width:18px;height:18px"></i></button>
     <button class="icobtn blue" onclick="inviteRoom()" title="Пригласить"><i data-lucide="share-2" style="width:18px;height:18px"></i></button>
   </div>
 </header>
@@ -182,6 +196,7 @@ input[type=number]{appearance:textfield}
         <i data-lucide="plus" style="width:20px;height:20px;"></i>
       </button>
     </div>
+    <div id="quick-add" class="quick-add" style="display:none"></div>
   </div>
 
   <div class="card">
@@ -270,18 +285,51 @@ function getRoomId(){
   const u=new URL(window.location.href);
   const rp=u.searchParams.get('room');
   if(rp)return rp;
-  return genRoomId();
+  return null;
 }
 
 let S=null;
-try{S=JSON.parse(localStorage.getItem('delimschet_v3'))}catch(e){}
-const firstRun = !S||!S.parts;
-if(!S||!S.parts){
-  S={roomId:getRoomId(),cur:'₴',parts:[],expenses:[],polls:[],colls:[],del:{exp:[],poll:[],coll:[],part:[]}};
-  try{const v2=JSON.parse(localStorage.getItem('delimschet_v2'));if(v2&&v2.parts){S=v2;S.cur=v2.cur||'₴';}}catch(e){}
-  try{const v1=JSON.parse(localStorage.getItem('delimschet_v1'));if(v1&&v1.parts&&!S.parts.length){S.parts=v1.parts;S.expenses=v1.expenses||[];S.polls=v1.polls||[];S.colls=v1.colls||[];S.cur=v1.cur||'₴';}}catch(e){}
+const ROOMS_KEY='delimschet_all';
+let ROOMS=null;
+try{ROOMS=JSON.parse(localStorage.getItem(ROOMS_KEY))}catch(e){}
+if(!ROOMS||typeof ROOMS!=='object')ROOMS={current:null,rooms:{},meta:{}};
+const sharedUrlRoom=getRoomId();
+
+function newState(roomId,roomName){
+  const st={
+    roomId,
+    roomName:roomName||'Общая касса',
+    cur:'₴',parts:[],expenses:[],polls:[],colls:[],
+    del:{exp:[],poll:[],coll:[],part:[]}
+  };
+  if(tgUser)st.parts.push({id:myId,name:myName,photo:tgUser.photo_url||'',tg:tgUser.id,me:true});
+  return st;
 }
-if(!S.roomId)S.roomId=getRoomId();
+function loadRoom(id){
+  S=ROOMS.rooms[id];
+  if(!S)S=newState(id,'Общая касса');
+  if(!S.roomName)S.roomName='Общая касса';
+  if(!S.del)S.del={exp:[],poll:[],coll:[],part:[]};
+}
+if(sharedUrlRoom){
+  if(ROOMS.rooms[sharedUrlRoom]){ROOMS.current=sharedUrlRoom;loadRoom(sharedUrlRoom);}
+  else{S=newState(sharedUrlRoom,(ROOMS.meta[sharedUrlRoom]&&ROOMS.meta[sharedUrlRoom].name)||'Общая касса');ROOMS.current=sharedUrlRoom;ROOMS.rooms[sharedUrlRoom]=S;ROOMS.meta[sharedUrlRoom]={name:S.roomName,date:Date.now()};}
+}else if(ROOMS.current&&ROOMS.rooms[ROOMS.current]){
+  loadRoom(ROOMS.current);
+}else{
+  const ids=Object.keys(ROOMS.rooms);
+  if(ids.length){ROOMS.current=ids[0];loadRoom(ids[0]);}
+  else{
+    let migrated=false;
+    try{
+      const old=JSON.parse(localStorage.getItem('delimschet_v3'));
+      if(old&&old.parts){if(!old.roomId)old.roomId=genRoomId();if(!old.roomName)old.roomName='Касса';if(!old.del)old.del={exp:[],poll:[],coll:[],part:[]};ROOMS.current=old.roomId;ROOMS.rooms[old.roomId]=old;ROOMS.meta[old.roomId]={name:old.roomName,date:Date.now()};migrated=true;}
+    }catch(e){}
+    if(!migrated){const id=genRoomId();S=newState(id,'Общая касса');ROOMS.current=id;ROOMS.rooms[id]=S;ROOMS.meta[id]={name:'Общая касса',date:Date.now()};}
+  }
+}
+const firstRun=!S.parts.length;
+
 
 let pMode='plain',splitMode='equal',curCat='';
 
@@ -321,9 +369,43 @@ if(firstRun&&!tgUser&&!S.parts.length){
 
 /* ─── SUPABASE ─── */
 function save(){
-  try{localStorage.setItem('delimschet_v3',JSON.stringify(S))}catch(e){}
-  $('room-tag').textContent='🚪 '+S.roomId.slice(0,8)+'…';
+  ROOMS.rooms[S.roomId]=S;
+  ROOMS.current=S.roomId;
+  try{localStorage.setItem(ROOMS_KEY,JSON.stringify(ROOMS))}catch(e){}
+  try{localStorage.removeItem('delimschet_v3')}catch(e){}
+  rememberPeople();
+  const tag=$('room-tag');if(tag)tag.textContent='🚪 '+(S.roomName||'Общая касса');
+  const rn=$('room-name');if(rn)rn.textContent=S.roomName||'Общая касса';
   const br=$('bind-room-id');if(br)br.textContent=S.roomId;
+}
+const PEOPLE_KEY='delimschet_people';
+function rememberPeople(){
+  try{
+    let pool=JSON.parse(localStorage.getItem(PEOPLE_KEY)||'[]');
+    S.parts.forEach(p=>{
+      if(p.tg||p.me)return;
+      const nm=(p.name||'').trim();
+      if(!nm)return;
+      if(!pool.some(x=>x.name===nm))pool.push({name:nm,photo:p.photo||''});
+    });
+    pool=pool.slice(-30);
+    localStorage.setItem(PEOPLE_KEY,JSON.stringify(pool));
+  }catch(e){}
+}
+function renderQuickAdd(){
+  const box=$('quick-add');if(!box)return;
+  let pool=[];try{pool=JSON.parse(localStorage.getItem(PEOPLE_KEY)||'[]')}catch(e){}
+  const existing=new Set(S.parts.map(p=>(p.name||'').trim().toLowerCase()));
+  pool=pool.filter(x=>!existing.has((x.name||'').trim().toLowerCase())).slice(0,6);
+  if(!pool.length){box.style.display='none';return;}
+  box.style.display='block';
+  box.innerHTML='<div class="qa-label">Частые участники:</div>'+
+    '<div class="qa-row">'+pool.map(p=>`<span class="qa-chip" onclick="quickAddPart(${JSON.stringify(p.name)})">+ ${esc(p.name)}</span>`).join('')+'</div>';
+}
+function quickAddPart(name){
+  haptic();name=(name||'').trim();if(!name)return;
+  if(S.parts.some(p=>p.name===name)){toast('Уже есть');return;}
+  S.parts.push({id:nid(),name});save();renderAll();ok();toast('Участник добавлен');
 }
 const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
@@ -359,6 +441,45 @@ function applyRemote(st){
   save();
   renderAll();
 }
+/* ─── УПРАВЛЕНИЕ КОМНАТАМИ ─── */
+function switchRoom(id){
+  if(!ROOMS.rooms[id])return;
+  if(_realtime){try{_realtime.unsubscribe()}catch(e){}_realtime=null;}
+  ROOMS.current=id;loadRoom(id);save();syncPush();subscribeRoom();renderAll();
+}
+function createNewRoom(){
+  const v=$('newroom-name').value.trim();
+  if(!v){toast('Введите название');return;}
+  const id=genRoomId();
+  const st=newState(id,v);
+  ROOMS.current=id;ROOMS.rooms[id]=st;ROOMS.meta[id]={name:v,date:Date.now()};
+  if(_realtime){try{_realtime.unsubscribe()}catch(e){}_realtime=null;}
+  S=st;save();syncPush();subscribeRoom();renderAll();
+  $('newroom-overlay').style.display='none';$('newroom-name').value='';
+  toast('Новая касса создана');
+}
+function openRooms(){
+  const list=$('rooms-list');
+  const ids=Object.keys(ROOMS.rooms).sort((a,b)=>(ROOMS.meta[b]?.date||0)-(ROOMS.meta[a]?.date||0));
+  list.innerHTML=ids.map(id=>{
+    const m=ROOMS.meta[id]||{};const cur=id===S.roomId;
+    return `<div class="room-item ${cur?'on':''}" onclick="switchRoom('${id}')">
+      <span class="room-dot ${cur?'live':''}"></span>
+      <span class="room-title">${esc(m.name||'Общая касса')}</span>
+      <span class="room-id">${esc(id.slice(0,8))}…</span>
+    </div>`;
+  }).join('')||'<div class="empty">Нет касс</div>';
+  $('rooms-overlay').style.display='flex';
+}
+function renameRoomNow(){
+  const v=$('rename-room-input').value.trim();
+  if(!v){toast('Введите название');return;}
+  S.roomName=v;ROOMS.meta[S.roomId]={name:v,date:ROOMS.meta[S.roomId]?.date||Date.now()};
+  save();renderAll();$('room-name').textContent=v;$('rename-room-overlay').style.display='none';
+  toast('Название изменено');
+}
+function openNewRoom(){$('rooms-overlay').style.display='none';$('newroom-name').value='';$('newroom-overlay').style.display='flex';setTimeout(()=>$('newroom-name').focus(),100)}
+function openRenameRoom(){haptic();const el=$('rename-room-input');if(el)el.value=S.roomName||'';$('rename-room-overlay').style.display='flex';setTimeout(()=>el&&el.focus(),100)}
 function mergeState(a,b){
   const r=JSON.parse(JSON.stringify(a));
   if(!r.del)r.del={exp:[],poll:[],coll:[],part:[]};
@@ -761,6 +882,7 @@ function confirmBox(msg,cb){
 }
 function renderAll(){
   renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
+  renderQuickAdd();
   if(window.lucide)lucide.createIcons();
 }
 /* ─── ПЕРЕИМЕНОВАНИЕ ─── */
@@ -789,6 +911,41 @@ setTimeout(()=>{syncPull();subscribeRoom()},900);
     <div style="display:flex; gap:8px;">
       <button class="btn ghost" onclick="$('rename-overlay').style.display='none'">Отмена</button>
       <button class="btn" id="rename-save-btn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ОВЕРЛЕЙ МОИ КАССЫ -->
+<div id="rooms-overlay" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h3><i data-lucide="layers" style="color:var(--btn)"></i> Мои кассы</h3>
+    <div id="rooms-list" class="rooms-list"></div>
+    <button class="btn" onclick="openNewRoom()" style="margin-top:12px"><i data-lucide="plus" style="width:16px;height:16px"></i> Новая касса</button>
+    <button class="btn ghost" onclick="$('rooms-overlay').style.display='none'" style="margin-top:8px">Закрыть</button>
+  </div>
+</div>
+
+<!-- ОВЕРЛЕЙ НОВАЯ КАССА -->
+<div id="newroom-overlay" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h3><i data-lucide="plus-circle" style="color:var(--btn)"></i> Новая касса</h3>
+    <div class="sub">Название сбора или поездки</div>
+    <input type="text" id="newroom-name" placeholder="Напр: Поездка в горы" style="margin-bottom:12px;" onkeydown="if(event.key==='Enter')createNewRoom()">
+    <div style="display:flex;gap:8px;">
+      <button class="btn ghost" onclick="$('newroom-overlay').style.display='none'">Отмена</button>
+      <button class="btn" onclick="createNewRoom()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- ОВЕРЛЕЙ ПЕРЕИМЕНОВАНИЕ КАССЫ -->
+<div id="rename-room-overlay" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h3><i data-lucide="edit-3" style="color:var(--btn)"></i> Переименовать кассу</h3>
+    <input type="text" id="rename-room-input" placeholder="Новое название..." style="margin-bottom:12px;">
+    <div style="display:flex;gap:8px;">
+      <button class="btn ghost" onclick="$('rename-room-overlay').style.display='none'">Отмена</button>
+      <button class="btn" onclick="renameRoomNow()">Сохранить</button>
     </div>
   </div>
 </div>
