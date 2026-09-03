@@ -83,6 +83,7 @@ input[type=number]{appearance:textfield}
 .split-row .sinput{width:70px;padding:5px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;color:var(--txt);font-size:.78rem;text-align:center}
 .split-row .slbl{font-size:.72rem;color:var(--hint);min-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="toast" class="toast" id="toast"><span id="tt">Готово</span></div>
@@ -546,9 +547,71 @@ function renderAll(){
   renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
   if(window.lucide)lucide.createIcons();
 }
+
+/* ═══ SUPABASE SYNC ═══ */
+const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
+let _supabase = null, _realtime = null;
+try { _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) { console.log("Supabase init fail (offline)"); }
+
+function localStamp(){ return window._localStamp || 0 }
+function bumpLocal(){ window._localStamp = Date.now(); }
+
+async function syncPush(){
+  if(!_supabase || !S.roomId) return;
+  try {
+    const state = { id: S.roomId, state: JSON.parse(JSON.stringify(S)), updated_at: new Date().toISOString() };
+    await _supabase.from('rooms').upsert(state, { onConflict: 'id' });
+  } catch(e) { console.log("push fail", e.message) }
+}
+
+async function syncPull(){
+  if(!_supabase || !S.roomId) return;
+  try {
+    const { data } = await _supabase.from('rooms').select('state,updated_at').eq('id', S.roomId).single();
+    if (data && data.state) {
+      const remote = new Date(data.updated_at).getTime();
+      if (remote > localStamp()) {
+        applyRemote(data.state);
+        toast('🔄 Загружено из облака');
+      }
+    } else {
+      // room not in cloud yet — create it
+      await syncPush();
+    }
+  } catch(e) { console.log("pull fail", e.message) }
+}
+
+function applyRemote(st){
+  S = Object.assign({}, S, st);
+  S.roomId = st.roomId || S.roomId;
+  bumpLocal();
+  save(); renderAll();
+}
+
+function subscribeRoom(){
+  if(!_supabase || !S.roomId || _realtime) return;
+  _realtime = _supabase.channel('room:'+S.roomId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.'+S.roomId }, (payload) => {
+      if (payload.new && payload.new.state) {
+        const remote = new Date(payload.new.updated_at).getTime();
+        if (remote > localStamp()) applyRemote(payload.new.state);
+      }
+    }).subscribe();
+}
+
+/* перехват save: пушим в облако с дебаунсом */
+const _saveOrig = save;
+save = function(){
+  _saveOrig();
+  if(window._pushTimer) clearTimeout(window._pushTimer);
+  window._pushTimer = setTimeout(syncPush, 700);
+};
+
 /* init */
 save();renderAll();
 addPOpt('Часы',25000);addPOpt('Кошелёк',8000);
+setTimeout(()=>{ syncPull(); subscribeRoom(); }, 900);
 </script>
 </body>
 </html>
