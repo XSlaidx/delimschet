@@ -292,8 +292,16 @@ function normalize(){
     S.parts.unshift({id:myId,name:myName,photo:tgUser.photo_url||'',tg:tgUser.id,me:true});
   }
   // mark me
-  S.parts.forEach(p=>{if(p.tg===tgUser?.id)p.me=true});
-}
+    S.parts.forEach(p=>{if(p.tg===tgUser?.id)p.me=true});
+    // ensure tombstones
+    if(!S.del)S.del={exp:[],poll:[],coll:[],part:[]};
+    // coerce all ids to strings
+    S.parts.forEach(p=>p.id=String(p.id));
+    S.expenses.forEach(e=>e.id=String(e.id));
+    S.polls.forEach(p=>p.id=String(p.id));
+    S.colls.forEach(c=>c.id=String(c.id));
+  }
+  function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 normalize();
 if(firstRun&&!tgUser&&!S.parts.length){
   S.parts=[{id:'a',name:'Олег'},{id:'b',name:'Ирина'},{id:'c',name:'Андрей'}];
@@ -331,10 +339,73 @@ function applyRemote(st){
   // Не перерисовываем, если пользователь прямо сейчас печатает
   const a=document.activeElement;
   if(a&&(a.tagName==='INPUT'||a.tagName==='SELECT')){
-    setTimeout(()=>applyRemote(st),1500);
+    setTimeout(()=>applyRemote(st),3000);
     return;
   }
-  S=Object.assign({},S,st);normalize();_localStamp=Date.now();save();renderAll();
+  S=mergeState(S,st);
+  normalize();
+  _localStamp=Date.now();
+  save();
+  renderAll();
+}
+function mergeState(a,b){
+  // a=local, b=remote — сливаем коллекции по ID, удаляем через tombstones
+  const r=JSON.parse(JSON.stringify(a));
+  if(!r.del)r.del={exp:[],poll:[],coll:[],part:[]};
+  const bd=b.del||{};
+  // union tombstones
+  ['exp','poll','coll','part'].forEach(k=>{
+    (bd[k]||[]).forEach(id=>{if(!r.del[k].includes(id))r.del[k].push(id)});
+    if(r.del[k].length>500)r.del[k]=r.del[k].slice(-500);
+  });
+  // helper: union by id, apply tombstone, keep order: a first, then new from b
+  function union(aa,bb,delArr){
+    const map={};aa.forEach(x=>map[x.id]=x);
+    const out=aa.slice();
+    (bb||[]).forEach(x=>{if(!map[x.id]){const c=JSON.parse(JSON.stringify(x));out.push(c);map[x.id]=c}});
+    return out.filter(x=>!delArr.includes(x.id));
+  }
+  // parts
+  r.parts=union(a.parts,b.parts||[],r.del.part);
+  // expenses
+  r.expenses=union(a.expenses,b.expenses||[],r.del.exp);
+  // polls: union by id; merge votes per poll
+  r.polls=(function(){
+    const map={};a.polls.forEach(p=>map[p.id]=JSON.parse(JSON.stringify(p)));
+    (b.polls||[]).forEach(bp=>{
+      if(map[bp.id]){
+        const p=map[bp.id];
+        // merge votes: local wins for myId, remote wins for others
+        if(bp.votes&&typeof bp.votes==='object'&&!Array.isArray(bp.votes)){
+          if(!p.votes||Array.isArray(p.votes))p.votes={};
+          Object.keys(bp.votes).forEach(k=>{
+            if(k===myId){if(p.votes[k]===undefined)p.votes[k]=bp.votes[k]}
+            else p.votes[k]=bp.votes[k];
+          });
+        }
+      } else {
+        map[bp.id]=JSON.parse(JSON.stringify(bp));
+      }
+    });
+    return Object.values(map).filter(p=>!r.del.poll.includes(p.id));
+  })();
+  // colls: union by id; merge paid maps
+  r.colls=(function(){
+    const map={};a.colls.forEach(c=>map[c.id]=JSON.parse(JSON.stringify(c)));
+    (b.colls||[]).forEach(bc=>{
+      if(map[bc.id]){
+        const c=map[bc.id];
+        if(bc.paid)Object.keys(bc.paid).forEach(k=>{c.paid[k]=true});
+      } else {
+        map[bc.id]=JSON.parse(JSON.stringify(bc));
+      }
+    });
+    return Object.values(map).filter(c=>!r.del.coll.includes(c.id));
+  })();
+  // cur: keep local
+  r.cur=a.cur;
+  r.roomId=a.roomId;
+  return r;
 }
 function subscribeRoom(){
   if(!_supabase||!S.roomId||_realtime)return;
@@ -396,12 +467,12 @@ function renderParts(){
   renderShareInputs();
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function addPart(){const v=$('new-part').value.trim();if(!v)return;if(S.parts.some(p=>p.name===v)){toast('Уже есть');return}S.parts.push({id:'loc'+Date.now(),name:v});$('new-part').value='';save();renderAll();ok();toast('Участник добавлен')}
+function addPart(){const v=$('new-part').value.trim();if(!v)return;if(S.parts.some(p=>p.name===v)){toast('Уже есть');return}S.parts.push({id:nid(),name:v});$('new-part').value='';save();renderAll();ok();toast('Участник добавлен')}
 function delPart(id){
   haptic();
   if(pMe(id)){toast('Это вы — себя нельзя удалить');return}
   confirmBox('Удалить участника из комнаты?',()=>{
-    const idx=S.parts.findIndex(p=>p.id===id);if(idx>=0)S.parts.splice(idx,1);save();renderAll();toast('Участник удалён')
+    S.del.part.push(id);const idx=S.parts.findIndex(p=>p.id===id);if(idx>=0)S.parts.splice(idx,1);save();renderAll();toast('Участник удалён')
   });
 }
 function toggleFor(el,i){el.classList.toggle('on');haptic();if(splitMode==='custom')renderShareInputs()}
@@ -439,7 +510,7 @@ function addExpense(){
   if(!S.parts.some(p=>p.id===payer)){toast('Плательщик не участник');return}
   const shares=getShares();
   if(splitMode==='custom'){const s=Object.values(shares).reduce((a,b)=>a+b,0);if(Math.abs(s-amt)>0.01){toast('Сумма долей ≠ общей сумме');return}}
-  S.expenses.push({id:Date.now(),desc,amt,payer,for:forSel(),split:splitMode,shares});
+  S.expenses.push({id:nid(),desc,amt,payer,for:forSel(),split:splitMode,shares});
   $('e-desc').value='';$('e-amt').value='';save();renderAll();ok();
   logEvent('💸 '+pName(payer)+' добавил(а): «'+desc+'» — '+fmt(amt));
   toast('Трата добавлена');
@@ -447,7 +518,7 @@ function addExpense(){
 function delExp(id){
   haptic();
   confirmBox('Удалить эту трату? Это изменит долги всех участников.',()=>{
-    S.expenses=S.expenses.filter(e=>e.id!==id);save();renderAll();toast('Трата удалена')
+    S.del.exp.push(id);S.expenses=S.expenses.filter(e=>e.id!==id);save();renderAll();toast('Трата удалена')
   });
 }
 function renderExp(){
@@ -458,7 +529,7 @@ function renderExp(){
     const scope=e.for.length?e.for.map(id=>pName(id)).join(', '):'все поровну';
     const ml=e.split==='custom'?'🎯 по долям':'⚖️ поровну';
     return `<div class="exp-item"><div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">${esc(pName(e.payer))} · ${scope} · ${ml}</div></div><div class="amt">${fmt(e.amt)}</div>
-      <button class="icobtn" onclick="delExp(${e.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`
+      <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`
   }).join('');if(window.lucide)lucide.createIcons()
 }
 
@@ -501,7 +572,7 @@ function payDebt(fromId,toId,amt){
   confirmBox(`Подтвердить: ${pName(fromId)} вернул(а) долг ${fmt(amt)} пользователю ${pName(toId)}?`,()=>{
     // Математически возврат долга = платёж от fromId только за toId
     S.expenses.push({
-      id:Date.now(),desc:'💳 Возврат долга',amt,payer:fromId,for:[toId],split:'equal',shares:null
+      id:nid(),desc:'💳 Возврат долга',amt,payer:fromId,for:[toId],split:'equal',shares:null
     });
     logEvent('💳 '+pName(fromId)+' вернул(а) долг '+fmt(amt)+' пользователю '+pName(toId));
     save();renderAll();ok();toast('Долг возвращён ✅')
@@ -536,7 +607,7 @@ function createPoll(){
   const rows=[...$('p-opts').children].map(r=>{const t=r.querySelector('input[type=text]').value.trim();const pr=parseFloat(r.querySelector('input[type=number]').value)||0;return{t,pr}}).filter(x=>x.t);
   if(!q||rows.length<2){toast('Введите вопрос и минимум 2 варианта');return}
   if(pMode==='fund'&&rows.some(r=>!r.pr)){toast('Укажите цену для каждого варианта');return}
-  S.polls.unshift({id:Date.now(),q,mode:pMode,votes:{},opts:rows});
+  S.polls.unshift({id:nid(),q,mode:pMode,votes:{},opts:rows});
   $('p-q').value='';$('p-opts').innerHTML='';addPOpt();addPOpt();save();renderAll();ok();toast('Опрос создан')
 }
 function pollVoteCounts(p){
@@ -555,7 +626,7 @@ function votePoll(id,oi){
 function delPoll(id){
   haptic();
   confirmBox('Удалить этот опрос?',()=>{
-    S.polls=S.polls.filter(p=>p.id!==id);save();renderPolls();toast('Опрос удалён')
+    S.del.poll.push(id);S.polls=S.polls.filter(p=>p.id!==id);save();renderPolls();toast('Опрос удалён')
   });
 }
 function pollToCollect(id){
@@ -565,7 +636,7 @@ function pollToCollect(id){
   if(wi<0||max<=0){toast('Нет голосов');return}
   const opt=p.opts[wi];if(!opt.pr){toast('У варианта нет цены');return}
   confirmBox(`Собрать на победителя «${opt.t}» — ${fmt(opt.pr)}?`,()=>{
-    S.colls.unshift({id:Date.now(),title:`${p.q} — ${opt.t}`,target:opt.pr,paid:{}});
+    S.colls.unshift({id:nid(),title:`${p.q} — ${opt.t}`,target:opt.pr,paid:{}});
     save();renderAll();ok();logEvent('💰 Сбор на «'+p.q+' — '+opt.t+'» — '+fmt(opt.pr));toast('Сбор создан на '+fmt(opt.pr))
   });
 }
@@ -579,15 +650,15 @@ function renderPolls(){
     let wi=-1,wc=0;counts.forEach((c,i)=>{if(c>wc){wc=c;wi=i}});
     const myVote=p.votes&&!Array.isArray(p.votes)?p.votes[myId]:undefined;
     return `<div class="card"><h3 style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center">${p.mode==='fund'?'💰':'🗳️'} ${esc(p.q)}</span>
-      <button class="icobtn" onclick="delPoll(${p.id})"><i data-lucide="trash-2" style="width:15px;height:15px"></i></button></h3>
+      <button class="icobtn" onclick="delPoll('${p.id}')"><i data-lucide="trash-2" style="width:15px;height:15px"></i></button></h3>
       ${p.opts.map((o,i)=>{
         const v=counts[i]||0,pc=total?Math.round(v/total*100):0;
         const mine=myVote===i;
-        return `<div class="poll-opt ${i===wi&&v>0?'win':''}" onclick="votePoll(${p.id},${i})"><div class="fill" style="width:${pc}%"></div>
+        return `<div class="poll-opt ${i===wi&&v>0?'win':''}" onclick="votePoll('${p.id}',${i})"><div class="fill" style="width:${pc}%"></div>
           <div class="lbl"><span>${i===wi&&v>0?'👑':''} ${esc(o.t)}</span>${mine?' <b style="color:var(--green)">✓ вы</b>':''}${o.pr?`<span style="font-weight:700;color:var(--gold)">${fmt(o.pr)}</span>`:''}</div>
           <div class="pct">${v>0?v+' · '+pc+'%':'—'}</div></div>`}).join('')}
       <div style="display:flex;gap:7px;margin-top:9px;align-items:center"><span class="pill open">Голосов: ${total}</span>
-        ${p.mode==='fund'&&total>0?`<button class="btn ghost" style="flex:1" onclick="pollToCollect(${p.id})">💰 Собрать на победителя</button>`:''}
+        ${p.mode==='fund'&&total>0?`<button class="btn ghost" style="flex:1" onclick="pollToCollect('${p.id}')">💰 Собрать на победителя</button>`:''}
         <span style="font-size:.68rem;color:var(--hint);margin-left:auto">ваш голос: ${myVote!==undefined?'✓ учтён':'клик по варианту'}</span></div></div>`}).join('')
 }
 
@@ -595,7 +666,7 @@ function renderPolls(){
 function createColl(){
   const t=$('c-title').value.trim(),a=parseFloat($('c-amt').value);
   if(!t||!a||a<=0){toast('Заполните название и сумму');return}
-  S.colls.unshift({id:Date.now(),title:t,target:a,paid:{}});
+  S.colls.unshift({id:nid(),title:t,target:a,paid:{}});
   $('c-title').value='';$('c-amt').value='';save();renderAll();ok();logEvent('🐷 Сбор «'+t+'» — '+fmt(a));toast('Сбор начат')
 }
 function togglePaid(cid,pid){
@@ -609,13 +680,13 @@ function togglePaid(cid,pid){
 function delColl(id){
   haptic();
   confirmBox('Удалить этот сбор?',()=>{
-    S.colls=S.colls.filter(c=>c.id!==id);save();renderAll();toast('Сбор удалён')
+    S.del.coll.push(id);S.colls=S.colls.filter(c=>c.id!==id);save();renderAll();toast('Сбор удалён')
   });
 }
 function collToExpense(cid){
   haptic();const c=S.colls.find(x=>x.id===cid);if(!c)return;
   const payers=Object.keys(c.paid);if(!payers.length){toast('Отметьте, кто внёс');return}
-  S.expenses.push({id:Date.now(),desc:c.title,amt:c.target,payer:payers[0],for:[],split:'equal',shares:null});
+  S.expenses.push({id:nid(),desc:c.title,amt:c.target,payer:payers[0],for:[],split:'equal',shares:null});
   save();renderAll();ok();toast('Добавлено в траты')
 }
 function renderColls(){
@@ -630,10 +701,10 @@ function renderColls(){
       <div class="bar-bg"><div class="bar" style="width:${pct}%"></div></div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${S.parts.map(p=>{
         const isPaid=!!c.paid[p.id];
-        return `<span class="person ${isPaid?'paid':''}" onclick="togglePaid(${c.id},'${p.id}')">${isPaid?'✓':'○'} ${esc(p.name)}${isPaid?' · '+fmt(c.target/Math.max(1,S.parts.length)):''}</span>`
+        return `<span class="person ${isPaid?'paid':''}" onclick="togglePaid('${c.id}','${p.id}')">${isPaid?'✓':'○'} ${esc(p.name)}${isPaid?' · '+fmt(c.target/Math.max(1,S.parts.length)):''}</span>`
       }).join('')}</div>
-      <div class="dl" style="margin-top:10px">${done?`<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense(${c.id})">→ В траты</button>`:''}
-        <button class="icobtn" style="margin-left:auto" onclick="delColl(${c.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div></div>`
+      <div class="dl" style="margin-top:10px">${done?`<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense('${c.id}')">→ В траты</button>`:''}
+        <button class="icobtn" style="margin-left:auto" onclick="delColl('${c.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div></div>`
   }).join('')
 }
 
