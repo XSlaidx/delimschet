@@ -12,8 +12,8 @@
 :root{--bg:var(--tg-theme-bg-color,#0e1621);--bg2:var(--tg-theme-secondary-bg-color,#17212b);--txt:var(--tg-theme-text-color,#f5f5f5);--hint:var(--tg-theme-hint-color,#7d8b99);--btn:var(--tg-theme-button-color,#2ea6ff);--border:rgba(255,255,255,.07);--gold:#f5ba3c;--green:#4ade80;--red:#f87171}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;padding-bottom:90px;position:relative}
-header{background:var(--bg2);padding:11px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border);gap:6px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:7px;font-weight:800;font-size:1rem;min-width:0}
+header{background:var(--bg2);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border);gap:8px;flex-wrap:nowrap;overflow:hidden}
+.brand{display:flex;align-items:center;gap:7px;font-weight:800;font-size:1rem;min-width:0;flex-shrink:1;overflow:hidden;white-space:nowrap}
 .brand .ic{background:linear-gradient(135deg,#f5ba3c,#f97316);width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
 .badge{background:linear-gradient(135deg,#4ade80,#2ea6ff);color:#0e1621;font-size:.55rem;font-weight:800;padding:2px 6px;border-radius:16px;letter-spacing:.3px;white-space:nowrap}
 .room-tag{background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.25);color:var(--btn);font-size:.65rem;font-weight:700;padding:3px 8px;border-radius:12px;display:flex;align-items:center;gap:4px;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
@@ -44,7 +44,8 @@ input:focus,select:focus{border-color:var(--btn)}
 .exp-item .m{font-size:.72rem;color:var(--hint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .exp-item .amt{font-weight:800;color:var(--gold);white-space:nowrap}
 .exp-item .cat{font-size:1.2rem;margin-right:6px;flex-shrink:0}
-.icobtn{background:none;border:none;color:var(--hint);cursor:pointer;padding:5px;border-radius:8px;display:flex}
+.icobtn{background:none;border:none;color:var(--hint);cursor:pointer;padding:4px;border-radius:8px;display:flex;flex-shrink:0}
+.icobtn svg{width:17px;height:17px}
 .icobtn:hover{background:rgba(255,255,255,.08);color:var(--red)}
 .icobtn.blue:hover{color:var(--btn)}
 .bar-bg{background:rgba(0,0,0,.4);border-radius:8px;height:16px;overflow:hidden;margin:8px 0}
@@ -130,11 +131,10 @@ input[type=number]{appearance:textfield}
 <header>
   <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge">ROOM</span></div>
   <div class="head-acts">
-    <span class="room-tag" id="room-tag" onclick="copyRoomId()">🚪 комната</span>
-    <span class="room-name-tag" id="room-name" onclick="openRenameRoom()">Общая касса</span>
+    <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая касса</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
-    <button class="icobtn blue" onclick="openRooms()" title="Мои кассы"><i data-lucide="layers" style="width:18px;height:18px"></i></button>
-    <button class="icobtn blue" onclick="inviteRoom()" title="Пригласить"><i data-lucide="share-2" style="width:18px;height:18px"></i></button>
+    <button class="icobtn blue" onclick="openRooms()" title="Мои кассы"><i data-lucide="layers"></i></button>
+    <button class="icobtn blue" onclick="inviteRoom()" title="Пригласить"><i data-lucide="share-2"></i></button>
   </div>
 </header>
 
