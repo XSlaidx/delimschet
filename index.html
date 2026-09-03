@@ -131,7 +131,7 @@ input[type=number]{appearance:textfield}
     <div class="sub">Уведомления о тратах и сборах — прямо в чат вашей группы.</div>
     <ol style="margin:0 0 8px 18px;font-size:.8rem;color:var(--txt);line-height:1.7">
       <li>Добавьте бота <b>@delimschet_bot</b> в чат группы</li>
-      <li>Напишите в группе: <code style="background:rgba(0,0,0,.35);padding:1px 6px;border-radius:6px">/bind</code> <span class="room-tag" style="max-width:none" onclick="copyRoomId()">🚪 {{ROOM}}</span></li>
+      <li>Напишите в группе: <code style="background:rgba(0,0,0,.35);padding:1px 6px;border-radius:6px">/bind</code> <span class="room-tag" style="max-width:none" onclick="copyRoomId()">🚪 <span id="bind-room-id">…</span></span></li>
       <li>Готово — события будут приходить сюда автоматически</li>
     </ol>
     <div style="display:flex;gap:8px">
@@ -311,7 +311,7 @@ if(firstRun&&!tgUser&&!S.parts.length){
 function save(){
   try{localStorage.setItem('delimschet_v3',JSON.stringify(S))}catch(e){}
   $('room-tag').textContent='🚪 '+S.roomId.slice(0,8)+'…';
-  const br=$('bind-room-id');if(br)br.textContent='🚪 '+S.roomId;
+  const br=$('bind-room-id');if(br)br.textContent=S.roomId;
 }
 const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
@@ -710,7 +710,7 @@ function renderColls(){
 
 
 function copyBindCmd(){haptic();const t='/bind '+S.roomId;navigator.clipboard?.writeText(t);toast('Команда скопирована: '+t)}
-function openBotChat(){haptic();const b='@delimschet_bot';if(tg&&tg.openTelegramLink)tg.openTelegramLink('https://t.me/'+b);else{window.open('https://t.me/'+b)}}
+function openBotChat(){haptic();const b='delimschet_bot';if(tg&&tg.openTelegramLink)tg.openTelegramLink('https://t.me/'+b);else{window.open('https://t.me/'+b)}}
 
 /* ─── ОБЩЕЕ ─── */
 function renderAll(){
