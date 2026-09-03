@@ -126,6 +126,19 @@ input[type=number]{appearance:textfield}
       <button class="btn ghost" onclick="addPart()" style="flex:0 0 auto;padding:0 14px">＋</button>
     </div>
   </div>
+  <div class="card" style="border-color:rgba(46,166,255,.3);background:linear-gradient(135deg,rgba(46,166,255,.06),rgba(167,139,250,.06))">
+    <h3><i data-lucide="bot" style="color:#2ea6ff"></i> Бот-уведомитель</h3>
+    <div class="sub">Уведомления о тратах и сборах — прямо в чат вашей группы.</div>
+    <ol style="margin:0 0 8px 18px;font-size:.8rem;color:var(--txt);line-height:1.7">
+      <li>Добавьте бота <b>@delimschet_bot</b> в чат группы</li>
+      <li>Напишите в группе: <code style="background:rgba(0,0,0,.35);padding:1px 6px;border-radius:6px">/bind</code> <span class="room-tag" style="max-width:none" onclick="copyRoomId()">🚪 {{ROOM}}</span></li>
+      <li>Готово — события будут приходить сюда автоматически</li>
+    </ol>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost" onclick="copyBindCmd()" style="flex:1">📋 Скопировать /bind</button>
+      <button class="btn ghost" onclick="openBotChat()" style="flex:1">🤖 Открыть бота</button>
+    </div>
+  </div>
   <div class="card">
     <h3><i data-lucide="wallet" style="color:#4ade80"></i> Новая трата</h3>
     <div class="sub">Кто заплатил → остальные делят. Можно поровну или по долям.</div>
@@ -272,10 +285,15 @@ function normalize(){
 }
 normalize();
 if(firstRun&&!tgUser&&!S.parts.length){
-  S.parts=[{id:'a',name:'Олег'},{id:'b',name:'Ірина'},{id:'c',name:'Андрій'}];
+  S.parts=[{id:'a',name:'Олег'},{id:'b',name:'Ирина'},{id:'c',name:'Андрей'}];
 }
 
 /* ─── SUPABASE ─── */
+function save(){
+  try{localStorage.setItem('delimschet_v3',JSON.stringify(S))}catch(e){}
+  $('room-tag').textContent='🚪 '+S.roomId.slice(0,8)+'…';
+  const br=$('bind-room-id');if(br)br.textContent='🚪 '+S.roomId;
+}
 const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
 let _supabase=null,_realtime=null,_pushTimer=null,_localStamp=0;
@@ -538,6 +556,10 @@ function renderColls(){
         <button class="icobtn" style="margin-left:auto" onclick="delColl(${c.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div></div>`
   }).join('')
 }
+
+
+function copyBindCmd(){haptic();const t='/bind '+S.roomId;navigator.clipboard?.writeText(t);toast('Команда скопирована: '+t)}
+function openBotChat(){haptic();const b='@delimschet_bot';if(tg&&tg.openTelegramLink)tg.openTelegramLink('https://t.me/'+b);else{window.open('https://t.me/'+b)}}
 
 /* ─── ОБЩЕЕ ─── */
 function renderAll(){
