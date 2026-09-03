@@ -7,10 +7,11 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
 <style>
 :root{--bg:var(--tg-theme-bg-color,#0e1621);--bg2:var(--tg-theme-secondary-bg-color,#17212b);--txt:var(--tg-theme-text-color,#f5f5f5);--hint:var(--tg-theme-hint-color,#7d8b99);--btn:var(--tg-theme-button-color,#2ea6ff);--border:rgba(255,255,255,.07);--gold:#f5ba3c;--green:#4ade80;--red:#f87171}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;padding-bottom:80px}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;padding-bottom:90px;position:relative}
 header{background:var(--bg2);padding:11px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border);gap:6px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:7px;font-weight:800;font-size:1rem;min-width:0}
 .brand .ic{background:linear-gradient(135deg,#f5ba3c,#f97316);width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0}
@@ -42,18 +43,21 @@ input:focus,select:focus{border-color:var(--btn)}
 .exp-item .t{font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .exp-item .m{font-size:.72rem;color:var(--hint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .exp-item .amt{font-weight:800;color:var(--gold);white-space:nowrap}
+.exp-item .cat{font-size:1.2rem;margin-right:6px;flex-shrink:0}
 .icobtn{background:none;border:none;color:var(--hint);cursor:pointer;padding:5px;border-radius:8px;display:flex}
 .icobtn:hover{background:rgba(255,255,255,.08);color:var(--red)}
 .icobtn.blue:hover{color:var(--btn)}
 .bar-bg{background:rgba(0,0,0,.4);border-radius:8px;height:16px;overflow:hidden;margin:8px 0}
 .bar{height:100%;background:linear-gradient(90deg,#f5ba3c,#f97316);border-radius:8px;transition:width .4s;min-width:2px}
-.people-grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
-.person{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:24px;padding:4px 12px 4px 4px;font-size:.8rem;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.people-grid{display:flex;flex-wrap:nowrap;gap:7px;margin-top:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;padding-bottom:4px}
+.people-grid::-webkit-scrollbar{display:none}
+.person{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:24px;padding:4px 12px 4px 4px;font-size:.8rem;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;flex-shrink:0}
 .person.on{border-color:var(--btn);background:rgba(46,166,255,.12);color:var(--btn)}
 .person.paid{border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.1);color:var(--green)}
 .av{width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0}
 .av-init{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#0e1621;background:linear-gradient(135deg,#2ea6ff,#a78bfa);flex-shrink:0}
 .debt-row{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:11px;padding:9px 11px;margin-bottom:7px;font-size:.86rem}
+.debt-row.me{border-color:var(--btn);background:rgba(46,166,255,.08)}
 .debt-row .arrow{color:var(--btn)}
 .debt-row .sum{margin-left:auto;font-weight:800;color:var(--green)}
 .bal{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.85rem}
@@ -70,6 +74,9 @@ input:focus,select:focus{border-color:var(--btn)}
 .poll-opt .pct{position:relative;z-index:1;font-weight:800;color:var(--btn);font-size:.82rem}
 .poll-opt.win .lbl{color:var(--green)}
 .empty{text-align:center;padding:22px 12px;color:var(--hint);font-size:.85rem;line-height:1.5}
+.empty-state{text-align:center;padding:40px 20px}
+.empty-state i{width:48px;height:48px;color:var(--border);margin-bottom:10px}
+.empty-state .msg{color:var(--hint);margin-bottom:15px}
 .botnav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:100;padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
 .nav{flex:1;background:none;border:none;color:var(--hint);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.6rem;font-weight:700;cursor:pointer;padding:3px 0}
 .nav.on{color:var(--btn)}
@@ -89,6 +96,20 @@ input[type=number]{appearance:textfield}
 .overlay-box .sub{font-size:.8rem;margin-bottom:14px}
 .cur-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
 .cur-grid .chip{display:flex;align-items:center;justify-content:center;font-size:1.2rem;padding:12px;min-height:50px}
+/* FAB */
+.fab{position:fixed;bottom:80px;right:18px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2ea6ff,#4f7cff);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(46,166,255,.35);z-index:300;transition:transform .15s}
+.fab:active{transform:scale(.95)}
+.fab i{width:26px;height:26px}
+/* Bottom Sheet */
+.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top-left-radius:18px;border-top-right-radius:18px;padding:18px 16px;transform:translateY(100%);transition:transform .25s ease-out;z-index:350;max-height:85vh;overflow-y:auto}
+.sheet.on{transform:translateY(0)}
+.sheet .handle{width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 12px}
+.sheet h3{font-size:1rem;margin-bottom:4px;display:flex;gap:8px;align-items:center}
+.sheet .sub{font-size:.8rem;color:var(--hint);margin-bottom:12px}
+/* category chips */
+.cat-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.cat-chip{background:rgba(0,0,0,.25);border:1px solid var(--border);color:var(--hint);padding:8px 12px;border-radius:16px;font-size:1.1rem;cursor:pointer;transition:all .15s}
+.cat-chip.on{background:rgba(46,166,255,.15);border-color:var(--btn);color:var(--btn)}
 </style>
 </head>
 <body>
@@ -105,7 +126,7 @@ input[type=number]{appearance:textfield}
 
 <div class="container">
 
-<!-- ВЫБОР ВАЛЮТЫ ПРИ ПЕРВОМ ЗАПУСКЕ -->
+<!-- ВЫБОР ВАЛЮТЫ -->
 <div id="cur-overlay" class="overlay" style="display:none">
   <div class="overlay-box">
     <h3><i data-lucide="coins" style="color:#f5ba3c"></i> Валюта группы</h3>
@@ -115,63 +136,59 @@ input[type=number]{appearance:textfield}
   </div>
 </div>
 
-<!-- ТАБ 1: УЧАСТНИКИ + ТРАТЫ -->
+<!-- МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ ТРАТЫ -->
+<div id="exp-sheet" class="sheet">
+  <div class="handle"></div>
+  <h3><i data-lucide="wallet" style="color:#4ade80"></i> Новая трата</h3>
+  <div class="sub">Кто заплатил → остальные делят. Можно поровну или по долям.</div>
+  <label>Описание</label>
+  <input type="text" id="e-desc" placeholder="Напр: ужин / такси / подарок">
+  <label>Категория</label>
+  <div class="cat-grid" id="cat-grid">
+    <span class="cat-chip on" data-c="" onclick="pickCat(this,'')">📄 без категории</span>
+    <span class="cat-chip" data-c="🍕" onclick="pickCat(this,'🍕')">🍕 Еда</span>
+    <span class="cat-chip" data-c="🚕" onclick="pickCat(this,'🚕')">🚕 Транспорт</span>
+    <span class="cat-chip" data-c="🏠" onclick="pickCat(this,'🏠')">🏠 Жильё</span>
+    <span class="cat-chip" data-c="🛒" onclick="pickCat(this,'🛒')">🛒 Продукты</span>
+    <span class="cat-chip" data-c="🎟️" onclick="pickCat(this,'🎟️')">🎟️ Развлечения</span>
+  </div>
+  <label>Сумма</label>
+  <input type="number" inputmode="decimal" id="e-amt" placeholder="0" min="0" step="0.01" oninput="onAmtChange()">
+  <label>Кто заплатил</label>
+  <select id="e-payer"></select>
+  <label>Режим</label>
+  <div class="row">
+    <span class="chip on" id="mode-eq" onclick="setSplitMode('equal')">⚖️ Поровну</span>
+    <span class="chip" id="mode-cs" onclick="setSplitMode('custom')">🎯 По долям</span>
+  </div>
+  <div id="split-custom" style="display:none;margin-top:6px">
+    <div class="sub">Сколько каждый должен? Сумма долей = общей сумме.</div>
+    <div id="share-inputs"></div>
+    <div style="font-size:.78rem;color:var(--hint);margin-top:4px" id="share-sum">Остаток: <span style="color:var(--gold)">0</span></div>
+  </div>
+  <label>Делим между (пусто = все)</label>
+  <div class="people-grid" id="e-for"></div>
+  <button class="btn" onclick="addExpense();closeSheet()" style="margin-top:12px"><i data-lucide="plus" style="width:16px;height:16px"></i> Добавить трату</button>
+</div>
+
+<!-- ═══════ ТАБ 1: СПИСОК ТРАТ ═══════ -->
 <div id="tab-spend" class="tab active">
   <div class="card">
-    <h3><i data-lucide="users" style="color:#2ea6ff"></i> Участники</h3>
-    <div class="sub">Клик по человеку — удалить. Себя удалить нельзя.</div>
+    <h3><i data-lucide="users" style="color:#2ea6ff"></i> Участники комнаты</h3>
     <div class="people-grid" id="parts"></div>
-    <div style="display:flex;gap:7px;margin-top:9px">
-      <input type="text" id="new-part" placeholder="Имя участника…" style="flex:1" onkeydown="if(event.key==='Enter')addPart()">
-      <button class="btn ghost" onclick="addPart()" style="flex:0 0 auto;padding:0 14px">＋</button>
-    </div>
+    <button class="btn ghost" onclick="addPart()" style="margin-top:8px"><i data-lucide="plus" style="width:15px;height:15px"></i> Добавить участника</button>
   </div>
-  <div class="card" style="border-color:rgba(46,166,255,.3);background:linear-gradient(135deg,rgba(46,166,255,.06),rgba(167,139,250,.06))">
-    <h3><i data-lucide="bot" style="color:#2ea6ff"></i> Бот-уведомитель</h3>
-    <div class="sub">Уведомления о тратах и сборах — прямо в чат вашей группы.</div>
-    <ol style="margin:0 0 8px 18px;font-size:.8rem;color:var(--txt);line-height:1.7">
-      <li>Добавьте бота <b>@delimschet_bot</b> в чат группы</li>
-      <li>Напишите в группе: <code style="background:rgba(0,0,0,.35);padding:1px 6px;border-radius:6px">/bind</code> <span class="room-tag" style="max-width:none" onclick="copyRoomId()">🚪 <span id="bind-room-id">…</span></span></li>
-      <li>Готово — события будут приходить сюда автоматически</li>
-    </ol>
-    <div style="display:flex;gap:8px">
-      <button class="btn ghost" onclick="copyBindCmd()" style="flex:1">📋 Скопировать /bind</button>
-      <button class="btn ghost" onclick="openBotChat()" style="flex:1">🤖 Открыть бота</button>
-    </div>
-  </div>
-  <div class="card">
-    <h3><i data-lucide="wallet" style="color:#4ade80"></i> Новая трата</h3>
-    <div class="sub">Кто заплатил → остальные делят. Можно поровну или по долям.</div>
-    <label>Описание</label>
-    <input type="text" id="e-desc" placeholder="Напр: ужин / такси / подарок">
-    <label>Сумма</label>
-    <input type="number" inputmode="decimal" id="e-amt" placeholder="0" min="0" step="0.01" oninput="onAmtChange()">
-    <label>Кто заплатил</label>
-    <select id="e-payer"></select>
-    <label>Режим</label>
-    <div class="row">
-      <span class="chip on" id="mode-eq" onclick="setSplitMode('equal')">⚖️ Поровну</span>
-      <span class="chip" id="mode-cs" onclick="setSplitMode('custom')">🎯 По долям</span>
-    </div>
-    <div id="split-custom" style="display:none;margin-top:6px">
-      <div class="sub">Сколько каждый должен? Сумма долей = общей сумме.</div>
-      <div id="share-inputs"></div>
-      <div style="font-size:.78rem;color:var(--hint);margin-top:4px" id="share-sum">Остаток: <span style="color:var(--gold)">0</span></div>
-    </div>
-    <label>Делим между (пусто = все)</label>
-    <div class="people-grid" id="e-for"></div>
-    <button class="btn" onclick="addExpense()"><i data-lucide="plus" style="width:16px;height:16px"></i> Добавить трату</button>
-  </div>
+
   <div class="card">
     <h3 style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center"><i data-lucide="receipt" style="color:#f5ba3c"></i> Траты</span><span class="pill open" id="spent-total">0</span></h3>
     <div id="exp-list"></div>
   </div>
 </div>
 
-<!-- ТАБ 2: ДОЛГИ -->
+<!-- ═══════ ТАБ 2: ДОЛГИ ═══════ -->
 <div id="tab-debt" class="tab">
   <div class="card">
-    <h3><i data-lucide="scale" style="color:#a78bfa"></i> Баланс</h3>
+    <h3><i data-lucide="scale" style="color:#a78bfa"></i> Баланс участников</h3>
     <div class="sub">Минус — должен, плюс — ему должны.</div>
     <div id="balances"></div>
   </div>
@@ -182,7 +199,7 @@ input[type=number]{appearance:textfield}
   <button class="btn gold" onclick="copyDebts()"><i data-lucide="copy" style="width:16px;height:16px"></i> Скопировать долги</button>
 </div>
 
-<!-- ТАБ 3: ОПРОСЫ -->
+<!-- ═══════ ТАБ 3: ОПРОСЫ ═══════ -->
 <div id="tab-poll" class="tab">
   <div class="card">
     <h3><i data-lucide="vote" style="color:#2ea6ff"></i> Создать опрос</h3>
@@ -194,16 +211,16 @@ input[type=number]{appearance:textfield}
       <span class="chip on" id="mode-plain" onclick="setPMode('plain')">🗳️ Обычный</span>
       <span class="chip" id="mode-fund" onclick="setPMode('fund')">💰 Сбор</span>
     </div>
-    <div id="p-fundhint" style="display:none" class="sub">У вариантов есть цена.</div>
+    <div id="p-fundhint" style="display:none" class="sub">У каждого варианта есть цена.</div>
     <label>Варианты</label>
     <div id="p-opts"></div>
     <button class="btn ghost" onclick="addPOpt()" style="margin-bottom:6px"><i data-lucide="plus" style="width:15px;height:15px"></i> Вариант</button>
-    <button class="btn" onclick="createPoll()">Создать опрос</button>
+    <button class="btn" onclick="createPoll();closeSheet()">Создать опрос</button>
   </div>
   <div id="poll-list"></div>
 </div>
 
-<!-- ТАБ 4: СБОРЫ -->
+<!-- ═══════ ТАБ 4: СБОРЫ ═══════ -->
 <div id="tab-collect" class="tab">
   <div class="card">
     <h3><i data-lucide="piggy-bank" style="color:#f5ba3c"></i> Новый сбор</h3>
@@ -212,12 +229,15 @@ input[type=number]{appearance:textfield}
     <input type="text" id="c-title" placeholder="Напр: подарок">
     <label>Сумма</label>
     <input type="number" inputmode="decimal" id="c-amt" placeholder="0" min="0" step="0.01">
-    <button class="btn" onclick="createColl()">Начать сбор</button>
+    <button class="btn" onclick="createColl();closeSheet()">Начать сбор</button>
   </div>
   <div id="coll-list"></div>
 </div>
 
 </div>
+
+<!-- FAB -->
+<button class="fab" onclick="openSheet()" title="Добавить"><i data-lucide="plus"></i></button>
 
 <nav class="botnav">
   <button class="nav on" onclick="go('spend',this)"><i data-lucide="wallet"></i>Траты</button>
@@ -252,56 +272,43 @@ let S=null;
 try{S=JSON.parse(localStorage.getItem('delimschet_v3'))}catch(e){}
 const firstRun = !S||!S.parts;
 if(!S||!S.parts){
-  S={roomId:getRoomId(),cur:'₴',parts:[],expenses:[],polls:[],colls:[]};
+  S={roomId:getRoomId(),cur:'₴',parts:[],expenses:[],polls:[],colls:[],del:{exp:[],poll:[],coll:[],part:[]}};
   try{const v2=JSON.parse(localStorage.getItem('delimschet_v2'));if(v2&&v2.parts){S=v2;S.cur=v2.cur||'₴';}}catch(e){}
   try{const v1=JSON.parse(localStorage.getItem('delimschet_v1'));if(v1&&v1.parts&&!S.parts.length){S.parts=v1.parts;S.expenses=v1.expenses||[];S.polls=v1.polls||[];S.colls=v1.colls||[];S.cur=v1.cur||'₴';}}catch(e){}
 }
 if(!S.roomId)S.roomId=getRoomId();
 
-let pMode='plain',splitMode='equal';
+let pMode='plain',splitMode='equal',curCat='';
 
-/* ─── НОРМАЛИЗАЦИЯ (миграция строк → объекты) ─── */
+/* ─── НОРМАЛИЗАЦИЯ ─── */
 function normalize(){
-  // parts: строки → объекты
   if(S.parts.length && typeof S.parts[0]==='string')
     S.parts=S.parts.map((n,i)=>({id:'legacy_'+(i+1),name:n}));
   const byName={};S.parts.forEach(p=>byName[p.name]=p.id);
-  // expenses
   S.expenses.forEach(e=>{
     if(typeof e.payer==='string'&&byName[e.payer])e.payer=byName[e.payer];
     if(e.for&&e.for.length&&typeof e.for[0]==='string')e.for=e.for.map(n=>byName[n]||n).filter(id=>S.parts.some(p=>p.id===id));
     if(e.shares){const ns={};Object.keys(e.shares).forEach(k=>{const id=byName[k]||k;if(id)ns[id]=e.shares[k]});e.shares=ns}
+    if(!e.cat)e.cat='';
   });
-  // colls paid
   S.colls.forEach(c=>{
     if(c.paid){const np={};Object.keys(c.paid).forEach(k=>{const id=byName[k]||k;if(S.parts.some(p=>p.id===id))np[id]=true});c.paid=np}
   });
-  // polls: старый формат votes: number[] → объект {userId: index}
   S.polls.forEach(p=>{
-    if(p.votes&&Array.isArray(p.votes)){
-      const v={};
-      // голоса старого формата ни к кому не привязаны — оставляем только «свой» голос
-      // (накрученные чужие отбрасываем: их нельзя честно атрибутировать)
-      p.votes={};
-      p._migrated=true;
-    }
+    if(p.votes&&Array.isArray(p.votes))p.votes={};
     if(!p.votes)p.votes={};
   });
-  // add current user if tg
   if(tgUser&&!S.parts.some(p=>p.tg===tgUser.id)){
     S.parts.unshift({id:myId,name:myName,photo:tgUser.photo_url||'',tg:tgUser.id,me:true});
   }
-  // mark me
-    S.parts.forEach(p=>{if(p.tg===tgUser?.id)p.me=true});
-    // ensure tombstones
-    if(!S.del)S.del={exp:[],poll:[],coll:[],part:[]};
-    // coerce all ids to strings
-    S.parts.forEach(p=>p.id=String(p.id));
-    S.expenses.forEach(e=>e.id=String(e.id));
-    S.polls.forEach(p=>p.id=String(p.id));
-    S.colls.forEach(c=>c.id=String(c.id));
-  }
-  function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+  S.parts.forEach(p=>{if(p.tg===tgUser?.id)p.me=true});
+  if(!S.del)S.del={exp:[],poll:[],coll:[],part:[]};
+  S.parts.forEach(p=>p.id=String(p.id));
+  S.expenses.forEach(e=>e.id=String(e.id));
+  S.polls.forEach(p=>p.id=String(p.id));
+  S.colls.forEach(c=>c.id=String(c.id));
+}
+function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 normalize();
 if(firstRun&&!tgUser&&!S.parts.length){
   S.parts=[{id:'a',name:'Олег'},{id:'b',name:'Ирина'},{id:'c',name:'Андрей'}];
@@ -336,7 +343,6 @@ async function syncPull(){
   }catch(e){}
 }
 function applyRemote(st){
-  // Не перерисовываем, если пользователь прямо сейчас печатает
   const a=document.activeElement;
   if(a&&(a.tagName==='INPUT'||a.tagName==='SELECT')){
     setTimeout(()=>applyRemote(st),3000);
@@ -349,33 +355,26 @@ function applyRemote(st){
   renderAll();
 }
 function mergeState(a,b){
-  // a=local, b=remote — сливаем коллекции по ID, удаляем через tombstones
   const r=JSON.parse(JSON.stringify(a));
   if(!r.del)r.del={exp:[],poll:[],coll:[],part:[]};
   const bd=b.del||{};
-  // union tombstones
   ['exp','poll','coll','part'].forEach(k=>{
     (bd[k]||[]).forEach(id=>{if(!r.del[k].includes(id))r.del[k].push(id)});
     if(r.del[k].length>500)r.del[k]=r.del[k].slice(-500);
   });
-  // helper: union by id, apply tombstone, keep order: a first, then new from b
   function union(aa,bb,delArr){
     const map={};aa.forEach(x=>map[x.id]=x);
     const out=aa.slice();
     (bb||[]).forEach(x=>{if(!map[x.id]){const c=JSON.parse(JSON.stringify(x));out.push(c);map[x.id]=c}});
     return out.filter(x=>!delArr.includes(x.id));
   }
-  // parts
   r.parts=union(a.parts,b.parts||[],r.del.part);
-  // expenses
   r.expenses=union(a.expenses,b.expenses||[],r.del.exp);
-  // polls: union by id; merge votes per poll
   r.polls=(function(){
     const map={};a.polls.forEach(p=>map[p.id]=JSON.parse(JSON.stringify(p)));
     (b.polls||[]).forEach(bp=>{
       if(map[bp.id]){
         const p=map[bp.id];
-        // merge votes: local wins for myId, remote wins for others
         if(bp.votes&&typeof bp.votes==='object'&&!Array.isArray(bp.votes)){
           if(!p.votes||Array.isArray(p.votes))p.votes={};
           Object.keys(bp.votes).forEach(k=>{
@@ -389,7 +388,6 @@ function mergeState(a,b){
     });
     return Object.values(map).filter(p=>!r.del.poll.includes(p.id));
   })();
-  // colls: union by id; merge paid maps
   r.colls=(function(){
     const map={};a.colls.forEach(c=>map[c.id]=JSON.parse(JSON.stringify(c)));
     (b.colls||[]).forEach(bc=>{
@@ -402,7 +400,6 @@ function mergeState(a,b){
     });
     return Object.values(map).filter(c=>!r.del.coll.includes(c.id));
   })();
-  // cur: keep local
   r.cur=a.cur;
   r.roomId=a.roomId;
   return r;
@@ -417,7 +414,7 @@ function subscribeRoom(){
 const _saveOrig=save;
 save=function(){_saveOrig();if(_pushTimer)clearTimeout(_pushTimer);_pushTimer=setTimeout(syncPush,700)};
 
-/* ─── СОБЫТИЯ ДЛЯ БОТА (events) ─── */
+/* ─── СОБЫТИЯ ДЛЯ БОТА ─── */
 async function logEvent(text){
   if(!_supabase)return;
   try{await _supabase.from('events').insert({room_id:S.roomId,text})}catch(e){}
@@ -436,12 +433,7 @@ function haptic(){tg?.HapticFeedback?.impactOccurred('light')}
 function ok(){tg?.HapticFeedback?.notificationOccurred?.('success')}
 function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.createIcons();if(firstRun)showCurPicker()});
-function go(t,el){
-  haptic();
-  window.scrollTo(0,0);
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');
-  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')
-}
+function go(t,el){haptic();window.scrollTo(0,0);document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
 
 /* ─── КОМНАТА / ПРИГЛАШЕНИЕ ─── */
 const BOT_USERNAME = "delimschet_bot"
@@ -478,6 +470,9 @@ function delPart(id){
 function toggleFor(el,i){el.classList.toggle('on');haptic();if(splitMode==='custom')renderShareInputs()}
 function forSel(){const sel=[...$('e-for').querySelectorAll('.person.on')].map(x=>x.dataset.i);return sel.length===S.parts.length?[]:sel}
 
+/* ─── КАТЕГОРИИ ─── */
+function pickCat(el,c){haptic();document.querySelectorAll('#cat-grid .cat-chip').forEach(x=>x.classList.remove('on'));el.classList.add('on');curCat=c}
+
 /* ─── НЕРАВНЫЙ ДЕЛЁЖ ─── */
 function setSplitMode(m){haptic();splitMode=m;$('mode-eq').classList.toggle('on',m==='equal');$('mode-cs').classList.toggle('on',m==='custom');$('split-custom').style.display=m==='custom'?'block':'none';if(m==='custom')renderShareInputs()}
 function onAmtChange(){if(splitMode==='custom')renderShareInputs()}
@@ -510,8 +505,9 @@ function addExpense(){
   if(!S.parts.some(p=>p.id===payer)){toast('Плательщик не участник');return}
   const shares=getShares();
   if(splitMode==='custom'){const s=Object.values(shares).reduce((a,b)=>a+b,0);if(Math.abs(s-amt)>0.01){toast('Сумма долей ≠ общей сумме');return}}
-  S.expenses.push({id:nid(),desc,amt,payer,for:forSel(),split:splitMode,shares});
-  $('e-desc').value='';$('e-amt').value='';save();renderAll();ok();
+  S.expenses.push({id:nid(),desc,amt,payer,for:forSel(),split:splitMode,shares,cat:curCat});
+  $('e-desc').value='';$('e-amt').value='';curCat='';
+  save();renderAll();ok();
   logEvent('💸 '+pName(payer)+' добавил(а): «'+desc+'» — '+fmt(amt));
   toast('Трата добавлена');
 }
@@ -524,13 +520,14 @@ function delExp(id){
 function renderExp(){
   const box=$('exp-list'),tot=S.expenses.reduce((a,e)=>a+e.amt,0);
   $('spent-total').textContent=fmt(tot);
-  if(!S.expenses.length){box.innerHTML='<div class="empty">Трат пока нет.</div>';return}
+  if(!S.expenses.length){box.innerHTML=`<div class="empty-state"><i data-lucide="receipt"></i><div class="msg">Вы ещё ничего не потратили.<br>Добавьте первый чек!</div><button class="btn ghost" onclick="openSheet()">+ Добавить трату</button></div>`;return}
   box.innerHTML=S.expenses.map(e=>{
     const scope=e.for.length?e.for.map(id=>pName(id)).join(', '):'все поровну';
     const ml=e.split==='custom'?'🎯 по долям':'⚖️ поровну';
-    return `<div class="exp-item"><div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">${esc(pName(e.payer))} · ${scope} · ${ml}</div></div><div class="amt">${fmt(e.amt)}</div>
+    return `<div class="exp-item">${e.cat?`<span class="cat">${e.cat}</span>`:''}<div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">${esc(pName(e.payer))} · ${scope} · ${ml}</div></div><div class="amt">${fmt(e.amt)}</div>
       <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`
-  }).join('');if(window.lucide)lucide.createIcons()
+  }).join('');
+  if(window.lucide)lucide.createIcons();
 }
 
 /* ─── ДОЛГИ ─── */
@@ -564,15 +561,17 @@ function renderTransfers(){
   const t=settle();const box=$('transfers');
   if(!S.expenses.length){box.innerHTML='<div class="empty">Добавьте траты.</div>';return}
   if(!t.length){box.innerHTML='<div class="empty" style="color:var(--green)">✅ Все в расчёте</div>';return}
-  box.innerHTML=t.map(x=>`<div class="debt-row"><span style="font-weight:600">${esc(pName(x.from))}</span><span class="arrow">→</span><span style="font-weight:600">${esc(pName(x.to))}</span><span class="sum">${fmt(x.amt)}</span>
-    <button class="icobtn" style="color:var(--green)" title="Отдал(а) долг" onclick="payDebt('${x.from}','${x.to}',${x.amt})"><i data-lucide="check-circle-2" style="width:18px;height:18px"></i></button></div>`).join('')
+  box.innerHTML=t.map(x=>{
+    const isMe=x.from===myId||x.to===myId;
+    return `<div class="debt-row ${isMe?'me':''}"><span style="font-weight:600">${esc(pName(x.from))}</span><span class="arrow">→</span><span style="font-weight:600">${esc(pName(x.to))}</span><span class="sum">${fmt(x.amt)}</span>
+      <button class="icobtn" style="color:var(--green)" title="Отдал(а) долг" onclick="payDebt('${x.from}','${x.to}',${x.amt})"><i data-lucide="check-circle-2" style="width:18px;height:18px"></i></button></div>`
+  }).join('')
 }
 function payDebt(fromId,toId,amt){
   haptic();
   confirmBox(`Подтвердить: ${pName(fromId)} вернул(а) долг ${fmt(amt)} пользователю ${pName(toId)}?`,()=>{
-    // Математически возврат долга = платёж от fromId только за toId
     S.expenses.push({
-      id:nid(),desc:'💳 Возврат долга',amt,payer:fromId,for:[toId],split:'equal',shares:null
+      id:nid(),desc:'💳 Возврат долга',amt,payer:fromId,for:[toId],split:'equal',shares:null,cat:'💳'
     });
     logEvent('💳 '+pName(fromId)+' вернул(а) долг '+fmt(amt)+' пользователю '+pName(toId));
     save();renderAll();ok();toast('Долг возвращён ✅')
@@ -611,14 +610,13 @@ function createPoll(){
   $('p-q').value='';$('p-opts').innerHTML='';addPOpt();addPOpt();save();renderAll();ok();toast('Опрос создан')
 }
 function pollVoteCounts(p){
-  // votes: { userId: optionIndex } — считаем голоса по вариантам
   const counts=(p.opts||[]).map(()=>0);
   if(p.votes&&!Array.isArray(p.votes))Object.values(p.votes).forEach(i=>{if(counts[i]!==undefined)counts[i]++});
   return counts
 }
 function votePoll(id,oi){
   haptic();const p=S.polls.find(x=>x.id===id);if(!p)return;
-  if(!p.votes||Array.isArray(p.votes))p.votes={}; // старый формат → объект
+  if(!p.votes||Array.isArray(p.votes))p.votes={};
   if(p.votes[myId]===oi)delete p.votes[myId];
   else p.votes[myId]=oi;
   save();renderPolls();
@@ -637,12 +635,15 @@ function pollToCollect(id){
   const opt=p.opts[wi];if(!opt.pr){toast('У варианта нет цены');return}
   confirmBox(`Собрать на победителя «${opt.t}» — ${fmt(opt.pr)}?`,()=>{
     S.colls.unshift({id:nid(),title:`${p.q} — ${opt.t}`,target:opt.pr,paid:{}});
-    save();renderAll();ok();logEvent('💰 Сбор на «'+p.q+' — '+opt.t+'» — '+fmt(opt.pr));toast('Сбор создан на '+fmt(opt.pr))
+    save();renderAll();ok();
+    // 🎊 Конфетти
+    if(window.confetti)confetti({particleCount:120,spread:70,origin:{y:0.6}});
+    logEvent('💰 Сбор на «'+p.q+' — '+opt.t+'» — '+fmt(opt.pr));toast('Сбор создан на '+fmt(opt.pr))
   });
 }
 function renderPolls(){
   const box=$('poll-list');
-  if(!S.polls.length){box.innerHTML='<div class="card"><div class="empty">Опросов нет.</div></div>';return}
+  if(!S.polls.length){box.innerHTML=`<div class="empty-state"><i data-lucide="vote"></i><div class="msg">Опросов нет.<br>Создайте первый!</div><button class="btn ghost" onclick="openSheet()">+ Создать опрос</button></div>`;return}
   box.innerHTML=S.polls.map(p=>{
     const counts=pollVoteCounts(p);
     const total=counts.reduce((a,b)=>a+b,0);
@@ -673,9 +674,8 @@ function togglePaid(cid,pid){
   haptic();const c=S.colls.find(x=>x.id===cid);if(!c)return;
   if(c.paid[pid]){delete c.paid[pid]}else{c.paid[pid]=true}
   save();renderAll();
-  // check if 100%
   const pct=Object.keys(c.paid).length/(S.parts.length||1);
-  if(pct>=1)logEvent('✅ Сбор «'+c.title+'» — '+fmt(c.target)+' — закрыт!')
+  if(pct>=1)logEvent('✅ Сбор «'+c.title+'» — '+fmt(c.target)+' — закрит!')
 }
 function delColl(id){
   haptic();
@@ -685,13 +685,14 @@ function delColl(id){
 }
 function collToExpense(cid){
   haptic();const c=S.colls.find(x=>x.id===cid);if(!c)return;
-  const payers=Object.keys(c.paid);if(!payers.length){toast('Отметьте, кто внёс');return}
-  S.expenses.push({id:nid(),desc:c.title,amt:c.target,payer:payers[0],for:[],split:'equal',shares:null});
+  const payers=Object.keys(c.paid);
+  if(!payers.length){toast('Отметьте, кто внёс');return}
+  S.expenses.push({id:nid(),desc:c.title,amt:c.target,payer:payers[0],for:[],split:'equal',shares:null,cat:'💰'});
   save();renderAll();ok();toast('Добавлено в траты')
 }
 function renderColls(){
   const box=$('coll-list');
-  if(!S.colls.length){box.innerHTML='<div class="card"><div class="empty">Сборов нет.</div></div>';return}
+  if(!S.colls.length){box.innerHTML=`<div class="empty-state"><i data-lucide="piggy-bank"></i><div class="msg">Сборов нет.<br>Клик «💰 Собрать на победителя» в опросе создаст его сам.</div><button class="btn ghost" onclick="openSheet()">+ Новый сбор</button></div>`;return}
   box.innerHTML=S.colls.map(c=>{
     const paidAmt=Object.keys(c.paid).length*(c.target/Math.max(1,S.parts.length));
     const pct=Math.min(100,Math.round(paidAmt/c.target*100));const done=pct>=99.5;
@@ -703,23 +704,42 @@ function renderColls(){
         const isPaid=!!c.paid[p.id];
         return `<span class="person ${isPaid?'paid':''}" onclick="togglePaid('${c.id}','${p.id}')">${isPaid?'✓':'○'} ${esc(p.name)}${isPaid?' · '+fmt(c.target/Math.max(1,S.parts.length)):''}</span>`
       }).join('')}</div>
-      <div class="dl" style="margin-top:10px">${done?`<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense('${c.id}')">→ В траты</button>`:''}
+      <div class="dl" style="margin-top:10px">
+        ${done?`<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense('${c.id}')">→ В траты</button>`:''}
         <button class="icobtn" style="margin-left:auto" onclick="delColl('${c.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div></div>`
   }).join('')
 }
 
-
-function copyBindCmd(){haptic();const t='/bind '+S.roomId;navigator.clipboard?.writeText(t);toast('Команда скопирована: '+t)}
-function openBotChat(){haptic();const b='delimschet_bot';if(tg&&tg.openTelegramLink)tg.openTelegramLink('https://t.me/'+b);else{window.open('https://t.me/'+b)}}
+/* ─── SHEET / FAB ─── */
+let sheetType='';
+function openSheet(type='expense'){
+  haptic();sheetType=type;
+  const sh=$('exp-sheet');
+  sh.classList.add('on');
+  // reset form
+  $('e-desc').value='';$('e-amt').value='';curCat='';
+  document.querySelectorAll('#cat-grid .cat-chip').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('#cat-grid .cat-chip')[0].classList.add('on');
+  setSplitMode('equal');
+  renderParts();
+  if(window.lucide)lucide.createIcons();
+}
+function closeSheet(){
+  haptic();document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'))
+}
 
 /* ─── ОБЩЕЕ ─── */
+function confirmBox(msg,cb){
+  if(tg&&tg.showConfirm)tg.showConfirm(msg,ok=>{if(ok)cb()});
+  else if(window.confirm)cb(window.confirm(msg));
+  else cb(true);
+}
 function renderAll(){
   renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
-  if(window.lucide)lucide.createIcons()
+  if(window.lucide)lucide.createIcons();
 }
 /* init */
-save();renderAll();$('cur-chip').textContent=S.cur;
-addPOpt('Часы',25000);addPOpt('Кошелёк',8000);
+save();renderAll();
 setTimeout(()=>{syncPull();subscribeRoom()},900);
 </script>
 </body>
