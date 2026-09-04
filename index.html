@@ -258,7 +258,6 @@ input[type=number]{appearance:textfield}
         <input type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" style="flex:1; width:80px; display:none">
         <button type="button" class="icobtn" style="flex:0" onclick="this.parentElement.remove()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
-    </div>
       <div style="display:flex; gap:7px; margin-bottom:7px;">
         <input type="text" placeholder="Вариант" style="flex:2">
         <input type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" style="flex:1; width:80px; display:none">
@@ -626,7 +625,6 @@ function ok(){tg?.HapticFeedback?.notificationOccurred?.('success')}
 function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.createIcons();if(firstRun)showCurPicker()});
 function go(t,el){haptic();window.scrollTo(0,0);document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on');
-  const fab=document.querySelector('.fab');if(fab)fab.style.display=(t==='spend')?'flex':'none'}
   const fab=document.querySelector('.fab');if(fab)fab.style.display=(t==='spend')?'flex':'none'}
 
 /* ─── КОМНАТА / ПРИГЛАШЕНИЕ ─── */
