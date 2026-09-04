@@ -123,7 +123,9 @@ input[type=number]{appearance:textfield}
 .fab:active{transform:scale(.95)}
 .fab i{width:26px;height:26px}
 /* Bottom Sheet */
-.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top-left-radius:18px;border-top-right-radius:18px;padding:18px 16px;transform:translateY(100%);transition:transform .25s ease-out;z-index:350;max-height:85vh;overflow-y:auto}
+.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:340;opacity:0;pointer-events:none;transition:opacity .25s ease-out}
+.sheet-backdrop.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top-left-radius:18px;border-top-right-radius:18px;padding:18px 16px;transform:translateY(100%);transition:transform .25s ease-out;z-index:350;max-height:85vh;overflow-y:auto;box-shadow:0 -6px 24px rgba(0,0,0,.5)}
 .sheet.on{transform:translateY(0)}
 .sheet .handle{width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 12px}
 .sheet h3{font-size:1rem;margin-bottom:4px;display:flex;gap:8px;align-items:center}
@@ -135,13 +137,16 @@ input[type=number]{appearance:textfield}
 </style>
 </head>
 <body>
+<div id="debug-bar" style="display:none;background:#f87171;color:#fff;padding:8px 12px;font-size:.78rem;font-weight:700;text-align:center;position:sticky;top:0;z-index:999"></div>
+<div id="sheet-backdrop" class="sheet-backdrop" onclick="closeSheet()"></div>
 <div id="toast" class="toast"><span id="tt">Готово</span></div>
 
 <header>
-  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge">ROOM</span></div>
+  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Версия">v1.4</span></div>
   <div class="head-acts">
     <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая касса</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
+    <button class="icobtn" onclick="location.reload(true)" title="Обновить страницу" style="color:var(--hint)"><i data-lucide="rotate-cw" style="width:16px;height:16px"></i></button>
     <button class="icobtn blue" onclick="openRooms()" title="Мои кассы"><i data-lucide="layers"></i></button>
     <button class="icobtn blue" onclick="inviteRoom()" title="Пригласить"><i data-lucide="share-2"></i></button>
   </div>
@@ -161,8 +166,11 @@ input[type=number]{appearance:textfield}
 
 <!-- МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ ТРАТЫ -->
 <div id="exp-sheet" class="sheet">
-  <div class="handle"></div>
-  <h3><i data-lucide="wallet" style="color:#4ade80"></i> Новая трата</h3>
+  <div class="handle" onclick="closeSheet()" style="cursor:pointer" title="Нажмите, чтобы закрыть"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <h3 style="margin:0"><i data-lucide="wallet" style="color:#4ade80"></i> Новая трата</h3>
+    <button type="button" class="icobtn" onclick="closeSheet()" title="Закрыть" style="font-size:1.2rem;padding:4px 8px;line-height:1">✕</button>
+  </div>
   <div class="sub">Кто заплатил → остальные делят. Можно поровну или по долям.</div>
   <label>Описание</label>
   <input type="text" id="e-desc" placeholder="Напр: ужин / такси / подарок">
@@ -191,7 +199,10 @@ input[type=number]{appearance:textfield}
   </div>
   <label>Делим между (пусто = все)</label>
   <div class="people-grid" id="e-for"></div>
-  <button class="btn" onclick="addExpense();closeSheet()" style="margin-top:12px"><i data-lucide="plus" style="width:16px;height:16px"></i> Добавить трату</button>
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button type="button" class="btn ghost" onclick="closeSheet()" style="flex:1">Отмена</button>
+    <button type="button" class="btn" onclick="submitExpense()" style="flex:2"><i data-lucide="plus" style="width:16px;height:16px"></i> Добавить трату</button>
+  </div>
 </div>
 
 <!-- ═══════ ТАБ 1: СПИСОК ТРАТ ═══════ -->
@@ -647,10 +658,19 @@ function fmt(n){return (Math.round(n*100)/100).toLocaleString('ru-RU',{maximumFr
 function haptic(){try{tg?.HapticFeedback?.impactOccurred?.('light')}catch(e){}}
 function ok(){try{tg?.HapticFeedback?.notificationOccurred?.('success')}catch(e){}}
 function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
+window.onerror=function(msg,src,line){
+  const bar=document.getElementById('debug-bar');
+  if(bar){bar.style.display='block';bar.textContent='⚠️ JS Error: '+msg+' (line '+line+')';}
+};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
 document.addEventListener('DOMContentLoaded',()=>{
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)try{lucide.createIcons()}catch(e){}
   if(firstRun)showCurPicker();
   if(tgAuth.status==='expired')setTimeout(()=>toast('⚠️ Сессия Telegram устарела'),1200);
+  // Резервные слушатели для режима опросов
+  const bp=$('mode-plain'),bf=$('mode-fund');
+  if(bp)bp.addEventListener('click',()=>setPMode('plain'));
+  if(bf)bf.addEventListener('click',()=>setPMode('fund'));
 });
 function go(t,el){haptic();window.scrollTo(0,0);document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on');
   const fab=document.querySelector('.fab');if(fab)fab.style.display=(t==='spend')?'flex':'none'}
@@ -737,16 +757,22 @@ function getShares(){
 
 /* ─── ТРАТЫ ─── */
 function addExpense(){
-  const desc=$('e-desc').value.trim(),amt=parseFloat($('e-amt').value),payer=$('e-payer').value;
-  if(!desc||!amt||amt<=0){toast('Заполните описание и сумму');return}
-  if(!S.parts.some(p=>p.id===payer)){toast('Плательщик не участник');return}
+  const desc=$('e-desc').value.trim(),amt=parseFloat($('e-amt').value);
+  let payer=$('e-payer').value;
+  if(!desc||!amt||amt<=0){toast('Заполните описание и сумму');return false}
+  if(!S.parts.length){toast('Добавьте хотя бы одного участника');return false}
+  if(!payer||!S.parts.some(p=>p.id===payer)){
+    payer=S.parts[0].id;
+    if($('e-payer'))$('e-payer').value=payer;
+  }
   const shares=getShares();
-  if(splitMode==='custom'){const s=Object.values(shares).reduce((a,b)=>a+b,0);if(Math.abs(s-amt)>0.01){toast('Сумма долей ≠ общей сумме');return}}
+  if(splitMode==='custom'){const s=Object.values(shares).reduce((a,b)=>a+b,0);if(Math.abs(s-amt)>0.01){toast('Сумма долей ≠ общей сумме');return false}}
   S.expenses.push({id:nid(),desc,amt,payer,for:forSel(),split:splitMode,shares,cat:curCat});
   $('e-desc').value='';$('e-amt').value='';curCat='';
   save();renderAll();ok();
   logEvent('💸 '+pName(payer)+' добавил(а): «'+desc+'» — '+fmt(amt));
   toast('Трата добавлена');
+  return true;
 }
 function delExp(id){
   haptic();
@@ -1025,19 +1051,31 @@ function renderColls(){
 /* ─── SHEET / FAB ─── */
 let sheetType='';
 function openSheet(type='expense'){
-  haptic();sheetType=type;
+  try{haptic()}catch(e){}
+  sheetType=type;
   const sh=$('exp-sheet');
-  sh.classList.add('on');
+  if(sh)sh.classList.add('on');
+  const bd=$('sheet-backdrop');
+  if(bd)bd.classList.add('on');
   // reset form
-  $('e-desc').value='';$('e-amt').value='';curCat='';
+  const ed=$('e-desc'),ea=$('e-amt');
+  if(ed)ed.value='';if(ea)ea.value='';curCat='';
   document.querySelectorAll('#cat-grid .cat-chip').forEach(x=>x.classList.remove('on'));
-  document.querySelectorAll('#cat-grid .cat-chip')[0].classList.add('on');
+  const firstCat=document.querySelectorAll('#cat-grid .cat-chip')[0];
+  if(firstCat)firstCat.classList.add('on');
   setSplitMode('equal');
   renderParts();
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)try{lucide.createIcons()}catch(e){}
 }
 function closeSheet(){
-  haptic();document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'))
+  try{haptic()}catch(e){}
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on'));
+  const bd=$('sheet-backdrop');
+  if(bd)bd.classList.remove('on');
+}
+function submitExpense(){
+  const success=addExpense();
+  if(success)closeSheet();
 }
 
 /* ─── ОБЩЕЕ ─── */
