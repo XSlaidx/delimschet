@@ -85,7 +85,7 @@ input:focus,select:focus{border-color:var(--btn)}
 .nav{flex:1;background:none;border:none;color:var(--hint);display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.72rem;font-weight:700;cursor:pointer;padding:4px 0}
 .nav.on{color:var(--btn)}
 .nav i{width:24px;height:24px}
-.toast{position:fixed;top:62px;left:50%;transform:translateX(-50%) translateY(-18px);background:#2ea043;color:#fff;padding:10px 18px;border-radius:30px;font-size:.84rem;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:.3s;z-index:200}
+.toast{position:fixed;top:62px;left:50%;transform:translateX(-50%) translateY(-18px);background:#2ea043;color:#fff;padding:10px 18px;border-radius:30px;font-size:.84rem;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:.3s;z-index:9999}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .dl{display:flex;flex-wrap:wrap;gap:8px}
 .dl .btn.ghost{flex:1}
@@ -123,10 +123,10 @@ input[type=number]{appearance:textfield}
 .fab:active{transform:scale(.95)}
 .fab i{width:26px;height:26px}
 /* Bottom Sheet */
-.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:340;opacity:0;pointer-events:none;transition:opacity .25s ease-out}
-.sheet-backdrop.on{opacity:1;pointer-events:auto}
-.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top-left-radius:18px;border-top-right-radius:18px;padding:18px 16px;transform:translateY(100%);transition:transform .25s ease-out;z-index:350;max-height:85vh;overflow-y:auto;box-shadow:0 -6px 24px rgba(0,0,0,.5)}
-.sheet.on{transform:translateY(0)}
+.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:340;display:none;pointer-events:none}
+.sheet-backdrop.on{display:block;pointer-events:auto}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top-left-radius:18px;border-top-right-radius:18px;padding:18px 16px;z-index:350;max-height:85vh;overflow-y:auto;box-shadow:0 -6px 24px rgba(0,0,0,.5);display:none;pointer-events:none}
+.sheet.on{display:block;pointer-events:auto}
 .sheet .handle{width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 12px}
 .sheet h3{font-size:1rem;margin-bottom:4px;display:flex;gap:8px;align-items:center}
 .sheet .sub{font-size:.8rem;color:var(--hint);margin-bottom:12px}
@@ -137,12 +137,12 @@ input[type=number]{appearance:textfield}
 </style>
 </head>
 <body>
-<div id="debug-bar" style="display:none;background:#f87171;color:#fff;padding:8px 12px;font-size:.78rem;font-weight:700;text-align:center;position:sticky;top:0;z-index:999"></div>
+<div id="debug-bar" style="display:none;background:#ef4444;color:#fff;padding:8px 12px;font-size:.78rem;font-weight:700;text-align:center;position:fixed;top:0;left:0;right:0;z-index:10000;box-shadow:0 2px 10px rgba(0,0,0,.4)"></div>
 <div id="sheet-backdrop" class="sheet-backdrop" onclick="closeSheet()"></div>
 <div id="toast" class="toast"><span id="tt">Готово</span></div>
 
 <header>
-  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Версия">v1.4</span></div>
+  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Версия">v1.5</span></div>
   <div class="head-acts">
     <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая касса</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
@@ -295,7 +295,7 @@ input[type=number]{appearance:textfield}
     <input type="text" id="c-title" placeholder="Напр: подарок">
     <label>Сумма</label>
     <input type="number" inputmode="decimal" id="c-amt" placeholder="0" min="0" step="0.01">
-    <button class="btn" onclick="createColl();closeSheet()">Начать сбор</button>
+    <button class="btn" onclick="createColl()">Начать сбор</button>
   </div>
   <div id="coll-list"></div>
 </div>
@@ -662,6 +662,10 @@ window.onerror=function(msg,src,line){
   const bar=document.getElementById('debug-bar');
   if(bar){bar.style.display='block';bar.textContent='⚠️ JS Error: '+msg+' (line '+line+')';}
 };
+window.addEventListener('unhandledrejection',function(e){
+  const bar=document.getElementById('debug-bar');
+  if(bar){bar.style.display='block';bar.textContent='⚠️ Promise Error: '+(e.reason?.message||e.reason||'Unknown');}
+});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
 document.addEventListener('DOMContentLoaded',()=>{
   if(window.lucide)try{lucide.createIcons()}catch(e){}
@@ -759,8 +763,9 @@ function getShares(){
 function addExpense(){
   const desc=$('e-desc').value.trim(),amt=parseFloat($('e-amt').value);
   let payer=$('e-payer').value;
-  if(!desc||!amt||amt<=0){toast('Заполните описание и сумму');return false}
-  if(!S.parts.length){toast('Добавьте хотя бы одного участника');return false}
+  if(!desc){toast('⚠️ Введите описание траты');$('e-desc').focus();return false}
+  if(!amt||amt<=0){toast('⚠️ Введите сумму больше 0');$('e-amt').focus();return false}
+  if(!S.parts.length){toast('⚠️ Добавьте хотя бы одного участника');return false}
   if(!payer||!S.parts.some(p=>p.id===payer)){
     payer=S.parts[0].id;
     if($('e-payer'))$('e-payer').value=payer;
@@ -920,6 +925,7 @@ function setPMode(m){
   if(mf)mf.classList.toggle('on',m==='fund');
   if(fh)fh.style.display=m==='fund'?'block':'none';
   pollOptsPriceVis();
+  toast(m==='fund'?'💰 Режим «Сбор» включён':'🗳️ Обычный режим включён');
 }
 function addPOpt(v='',price=''){
   const d=document.createElement('div');d.style.display='flex';d.style.gap='7px';d.style.marginBottom='7px';
@@ -981,7 +987,7 @@ function pollToCollect(id){
 }
 function renderPolls(){
   const box=$('poll-list');
-  if(!S.polls.length){box.innerHTML=`<div class="empty-state"><i data-lucide="vote"></i><div class="msg">Опросов нет.<br>Создайте первый!</div><button class="btn ghost" onclick="openSheet()">+ Создать опрос</button></div>`;return}
+  if(!S.polls.length){box.innerHTML=`<div class="empty-state"><i data-lucide="vote"></i><div class="msg">Опросов нет.<br>Создайте первый!</div><button class="btn ghost" onclick="$('p-q').focus();$('p-q').scrollIntoView({behavior:'smooth'})">+ Создать опрос</button></div>`;return}
   box.innerHTML=S.polls.map(p=>{
     const counts=pollVoteCounts(p);
     const total=counts.reduce((a,b)=>a+b,0);
@@ -1004,9 +1010,10 @@ function renderPolls(){
 /* ─── СБОРЫ ─── */
 function createColl(){
   const t=$('c-title').value.trim(),a=parseFloat($('c-amt').value);
-  if(!t||!a||a<=0){toast('Заполните название и сумму');return}
+  if(!t){toast('⚠️ Введите название сбора');$('c-title').focus();return}
+  if(!a||a<=0){toast('⚠️ Введите сумму сбора больше 0');$('c-amt').focus();return}
   S.colls.unshift({id:nid(),title:t,target:a,paid:{}});
-  $('c-title').value='';$('c-amt').value='';save();renderAll();ok();logEvent('🐷 Сбор «'+t+'» — '+fmt(a));toast('Сбор начат')
+  $('c-title').value='';$('c-amt').value='';save();renderAll();ok();logEvent('🐷 Сбор «'+t+'» — '+fmt(a));toast('✅ Сбор начат!')
 }
 function togglePaid(cid,pid){
   haptic();const c=S.colls.find(x=>x.id===cid);if(!c)return;
@@ -1030,7 +1037,7 @@ function collToExpense(cid){
 }
 function renderColls(){
   const box=$('coll-list');
-  if(!S.colls.length){box.innerHTML=`<div class="empty-state"><i data-lucide="piggy-bank"></i><div class="msg">Сборов нет.<br>Клик «💰 Собрать на победителя» в опросе создаст его сам.</div><button class="btn ghost" onclick="openSheet()">+ Новый сбор</button></div>`;return}
+  if(!S.colls.length){box.innerHTML=`<div class="empty-state"><i data-lucide="piggy-bank"></i><div class="msg">Сборов нет.<br>Клик «💰 Собрать на победителя» в опросе создаст его сам.</div><button class="btn ghost" onclick="$('c-title').focus();$('c-title').scrollIntoView({behavior:'smooth'})">+ Новый сбор</button></div>`;return}
   box.innerHTML=S.colls.map(c=>{
     const paidAmt=Object.keys(c.paid).length*(c.target/Math.max(1,S.parts.length));
     const pct=Math.min(100,Math.round(paidAmt/c.target*100));const done=pct>=99.5;
