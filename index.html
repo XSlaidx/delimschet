@@ -1483,6 +1483,22 @@
       if (_realtime) { try { _realtime.unsubscribe() } catch (e) { } _realtime = null; }
       ROOMS.current = id; loadRoom(id); save(); syncPush(); subscribeRoom(); renderAll();
     }
+    function selectRoom(id) {
+      if (!ROOMS.rooms[id]) return;
+      const ov = $('rooms-overlay');
+      const wasOpen = ov && ov.style.display !== 'none';
+      if (id === S.roomId) { if (wasOpen) ov.style.display = 'none'; return; }
+      switchRoom(id);
+      // Обновить подсветку активной кассы прямо в открытом списке
+      document.querySelectorAll('#rooms-list .room-item').forEach(el => {
+        const on = el.dataset.id === id;
+        el.classList.toggle('on', on);
+        const dot = el.querySelector('.room-dot');
+        if (dot) dot.classList.toggle('live', on);
+      });
+      // Небольшая пауза, чтобы глаз увидел переход подсветки, затем закрываем
+      if (wasOpen) setTimeout(() => { ov.style.display = 'none' }, 300);
+    }
     function createNewRoom() {
       const v = $('newroom-name').value.trim();
       if (!v) { toast('Введите название'); return; }
@@ -1509,7 +1525,7 @@
       const act = isArch
         ? `<span class="room-act" onclick="event.stopPropagation();restoreRoom('${id}')">♻︎</span>`
         : `<span class="room-act" onclick="event.stopPropagation();archiveRoom('${id}')">🗄</span>`;
-      return `<div class="room-item ${cur ? 'on' : ''} ${isArch ? 'arch' : ''}" onclick="switchRoom('${id}')">
+      return `<div class="room-item ${cur ? 'on' : ''} ${isArch ? 'arch' : ''}" data-id="${id}" onclick="selectRoom('${id}')">
     <span class="room-dot ${cur ? 'live' : ''}"></span>
     <span class="room-title">${esc(m.name || 'Общая касса')}</span>
     <span class="room-id">${esc(id.slice(0, 8))}…</span>
