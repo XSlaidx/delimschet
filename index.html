@@ -169,7 +169,7 @@ input[type=number]{appearance:textfield}
 <div id="toast" class="toast"><span id="tt">Готово</span></div>
 
 <header>
-  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Нажмите для сброса кэша" onclick="forceHardReload()" style="cursor:pointer">v1.6 ↻</span></div>
+  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Нажмите для сброса кэша" onclick="forceHardReload()" style="cursor:pointer">v1.7 ↻</span></div>
   <div class="head-acts">
     <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая касса</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
@@ -353,6 +353,8 @@ function parseNum(val){
   return isNaN(n)?0:n;
 }
 
+let pMode='plain',splitMode='equal',curCat='';
+let S=null;
 const CURS=['₴','$','€','₽','₸','zł'];
 
 /* ─── TELEGRAM USER & INITDATA VALIDATION ─── */
@@ -395,7 +397,6 @@ function getRoomId(){
   return null;
 }
 
-let S=null;
 const ROOMS_KEY='delimschet_all';
 let ROOMS=null;
 try{ROOMS=JSON.parse(localStorage.getItem(ROOMS_KEY))}catch(e){}
@@ -413,6 +414,7 @@ function newState(roomId,roomName){
   return st;
 }
 function loadRoom(id){
+  if(!id)return;
   S=ROOMS.rooms[id];
   if(!S)S=newState(id,'Общая касса');
   if(!S.roomName)S.roomName='Общая касса';
@@ -424,24 +426,53 @@ if(sharedUrlRoom){
 }else if(ROOMS.current&&ROOMS.rooms[ROOMS.current]){
   loadRoom(ROOMS.current);
 }else{
-  const ids=Object.keys(ROOMS.rooms);
+  const ids=Object.keys(ROOMS.rooms||{});
   if(ids.length){ROOMS.current=ids[0];loadRoom(ids[0]);}
   else{
     let migrated=false;
     try{
       const old=JSON.parse(localStorage.getItem('delimschet_v3'));
-      if(old&&old.parts){if(!old.roomId)old.roomId=genRoomId();if(!old.roomName)old.roomName='Касса';if(!old.del)old.del={exp:[],poll:[],coll:[],part:[]};ROOMS.current=old.roomId;ROOMS.rooms[old.roomId]=old;ROOMS.meta[old.roomId]={name:old.roomName,date:Date.now()};migrated=true;}
+      if(old&&old.parts){
+        if(!old.roomId)old.roomId=genRoomId();
+        if(!old.roomName)old.roomName='Касса';
+        if(!old.del)old.del={exp:[],poll:[],coll:[],part:[]};
+        ROOMS.current=old.roomId;
+        ROOMS.rooms[old.roomId]=old;
+        ROOMS.meta[old.roomId]={name:old.roomName,date:Date.now()};
+        S=old;
+        migrated=true;
+      }
     }catch(e){}
-    if(!migrated){const id=genRoomId();S=newState(id,'Общая касса');ROOMS.current=id;ROOMS.rooms[id]=S;ROOMS.meta[id]={name:'Общая касса',date:Date.now()};}
+    if(!migrated){
+      const id=genRoomId();
+      S=newState(id,'Общая касса');
+      ROOMS.current=id;
+      ROOMS.rooms[id]=S;
+      ROOMS.meta[id]={name:'Общая касса',date:Date.now()};
+    }
   }
 }
-const firstRun = !S || !S.parts?.length;
 
+// Гарантированная защита от null
+if(!S || typeof S !== 'object'){
+  const fallbackId = genRoomId();
+  S = newState(fallbackId, 'Общая касса');
+  ROOMS.current = fallbackId;
+  ROOMS.rooms[fallbackId] = S;
+  ROOMS.meta[fallbackId] = { name: 'Общая касса', date: Date.now() };
+}
 
-let pMode='plain',splitMode='equal',curCat='';
+const firstRun = !S.parts || !S.parts.length;
 
 /* ─── НОРМАЛИЗАЦИЯ ─── */
 function normalize(){
+  if(!S || typeof S !== 'object') return;
+  if(!Array.isArray(S.parts)) S.parts = [];
+  if(!Array.isArray(S.expenses)) S.expenses = [];
+  if(!Array.isArray(S.polls)) S.polls = [];
+  if(!Array.isArray(S.colls)) S.colls = [];
+  if(!S.del || typeof S.del !== 'object') S.del = {exp:[],poll:[],coll:[],part:[]};
+
   if(S.parts.length && typeof S.parts[0]==='string')
     S.parts=S.parts.map((n,i)=>({id:'legacy_'+(i+1),name:n}));
   const byName={};S.parts.forEach(p=>byName[p.name]=p.id);
