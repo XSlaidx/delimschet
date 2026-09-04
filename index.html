@@ -23,7 +23,7 @@
     function forceHardReload() {
       try {
         const u = new URL(window.location.href);
-        u.searchParams.set('_v', '1.8_' + Date.now());
+        u.searchParams.set('_v', '1.10_' + Date.now());
         window.location.href = u.toString();
       } catch (e) {
         window.location.reload(true);
@@ -1087,6 +1087,36 @@
       margin-top: -3px
     }
 
+    .ps-item .ring {
+      position: relative;
+      cursor: pointer
+    }
+
+    .ps-item.fil .ring {
+      background: conic-gradient(from 0deg, #4ade80, #f5ba3c, #4ade80)
+    }
+
+    .ps-item .fil-badge {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      background: var(--green);
+      color: #0e1621;
+      font-size: .6rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--bg2)
+    }
+
+    .ps-item.fil .nm {
+      color: var(--green)
+    }
+
     .ps-add {
       width: 44px;
       height: 44px;
@@ -1150,6 +1180,22 @@
       cursor: pointer
     }
 
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(46, 166, 255, .13);
+      border: 1px solid rgba(46, 166, 255, .3);
+      color: var(--btn);
+      font-size: .78rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 20px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      user-select: none
+    }
+
     /* ─── ШТОРКА ПРОСМОТРА ЧЕКА ─── */
     .det-row {
       display: flex;
@@ -1207,7 +1253,7 @@
 
   <header>
     <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Нажмите для сброса кэша"
-        onclick="forceHardReload()" style="cursor:pointer">v1.8 ↻</span></div>
+        onclick="forceHardReload()" style="cursor:pointer">v1.10 ↻</span></div>
     <div class="head-acts">
       <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая
         касса</span>
@@ -1252,7 +1298,7 @@
         <span class="cat-chip" data-c="🎟️" onclick="pickCat(this,'🎟️')">🎟️ Развлечения</span>
       </div>
       <label>Сумма</label>
-      <input type="text" inputmode="decimal" id="e-amt" placeholder="0" autocomplete="off" oninput="onAmtChange()">
+      <input type="text" inputmode="decimal" id="e-amt" placeholder="0" autocomplete="off" oninput="onAmtChange()" onblur="evalAmtInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();evalAmtInput(this);submitExpense()}">
       <label>Кто заплатил</label>
       <div class="people-grid" id="e-payer-chips"></div>
       <label>Режим</label>
@@ -1267,6 +1313,11 @@
             style="color:var(--gold)">0</span></div>
       </div>
       <label>Делим между (пусто = все)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+        <span class="chip" style="padding:5px 9px;font-size:.72rem" onclick="forPick('all')">✓ Все</span>
+        <span class="chip" style="padding:5px 9px;font-size:.72rem" onclick="forPick('me')">👤 Только я</span>
+        <span class="chip" style="padding:5px 9px;font-size:.72rem" onclick="forPick('none')">✕ Снять всех</span>
+      </div>
       <div class="people-grid" id="e-for"></div>
       <div style="display:flex;gap:8px;margin-top:14px">
         <button type="button" class="btn ghost" onclick="closeSheet()" style="flex:1">Отмена</button>
@@ -1405,7 +1456,7 @@
         <label>На что</label>
         <input type="text" id="c-title" placeholder="Напр: подарок">
         <label>Сумма</label>
-        <input type="text" inputmode="decimal" id="c-amt" placeholder="0" autocomplete="off">
+        <input type="text" inputmode="decimal" id="c-amt" placeholder="0" autocomplete="off" onblur="evalAmtInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();evalAmtInput(this);createColl()}">
         <button class="btn" onclick="createColl()">Начать сбор</button>
       </div>
       <div id="coll-list"></div>
@@ -1444,10 +1495,64 @@
       const n = parseFloat(s);
       return isNaN(n) ? 0 : n;
     }
+    // Безопасный калькулятор выражений: «150 + 80 * 2» → итог.
+    // Разрешены только цифры, точка и + - * / ( ). Без Function/eval.
+    function calcExpr(str) {
+      const s = String(str).replace(/,/g, '.').replace(/[^0-9.+\-*/().]/g, '');
+      if (!s) return NaN;
+      try {
+        let pos = 0;
+        function peek() { while (pos < s.length && s[pos] === ' ') pos++; return s[pos] }
+        function num() {
+          const m = /^\d*\.?\d+/.exec(s.slice(pos));
+          if (!m) throw 0;
+          pos += m[0].length;
+          return parseFloat(m[0]);
+        }
+        function factor() {
+          if (peek() === '-') { pos++; return -factor() }
+          if (peek() === '+') { pos++; return factor() }
+          if (peek() === '(') { pos++; const v = expr(); if (peek() !== ')') throw 0; pos++; return v }
+          return num();
+        }
+        function term() {
+          let v = factor();
+          while (peek() === '*' || peek() === '/') {
+            const op = peek(); pos++;
+            const r = factor();
+            v = op === '*' ? v * r : v / r;
+          }
+          return v;
+        }
+        function expr() {
+          let v = term();
+          while (peek() === '+' || peek() === '-') {
+            const op = peek(); pos++;
+            const r = term();
+            v = op === '+' ? v + r : v - r;
+          }
+          return v;
+        }
+        const r = expr();
+        if (pos < s.length || !isFinite(r)) return NaN;
+        return r;
+      } catch (e) { return NaN }
+    }
+    function evalAmtInput(el) {
+      if (!el) return;
+      const v = String(el.value || '').trim();
+      if (!v || !/[+\-*/()]/.test(v)) { el.value = parseNum(v); return }
+      const r = calcExpr(v);
+      if (!isNaN(r) && r > 0) {
+        el.value = Math.round(r * 100) / 100;
+        if (el.id === 'e-amt' && splitMode === 'custom') renderShareInputs();
+      }
+    }
 
     let pMode = 'plain', splitMode = 'equal', curCat = '';
     let payerId = '';        // выбранный плательщик (чип в шторке)
     let editExpId = null;    // id траты в режиме редактирования
+    let filterPart = null;   // фильтр ленты по участнику (id) — null = все
     let S = null;
     const CURS = ['₴', '$', '€', '₽', '₸', 'zł'];
 
@@ -1696,7 +1801,7 @@
     function switchRoom(id) {
       if (!ROOMS.rooms[id]) return;
       if (_realtime) { try { _realtime.unsubscribe() } catch (e) { } _realtime = null; }
-      ROOMS.current = id; loadRoom(id); save(); syncPush(); subscribeRoom(); renderAll();
+      ROOMS.current = id; loadRoom(id); filterPart = null; save(); syncPush(); subscribeRoom(); renderAll();
     }
     function selectRoom(id) {
       if (!ROOMS.rooms[id]) return;
@@ -1894,11 +1999,11 @@
     function pMe(id) { return id === myId }
     function renderParts() {
       const cnt = $('parts-count'); if (cnt) cnt.textContent = '(' + S.parts.length + ')';
-      // Компактная полоска участников (сторис)
+      // Компактная полоска участников (сторис): кольцо = фильтр ленты, имя = профиль
       $('parts').innerHTML = S.parts.length
-        ? S.parts.map(p => `<button type="button" class="ps-item ${p.me ? 'me' : ''}" onclick="openPartProfile('${p.id}')">
-    <span class="ring"><span class="inner">${p.photo ? `<img src="${esc(p.photo)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : `<span class="av-init">${esc((p.name || '?').trim()[0] || '?')}</span>`}</span></span>
-    <span class="nm">${esc(p.name)}</span>${p.me ? '<span class="you-tag">вы</span>' : ''}</button>`).join('')
+        ? S.parts.map(p => `<div class="ps-item ${p.me ? 'me' : ''} ${filterPart === p.id ? 'fil' : ''}" title="Тап по кружку — фильтр чеков; по имени — профиль">
+    <span class="ring" onclick="togglePartFilter('${p.id}')"><span class="inner">${p.photo ? `<img src="${esc(p.photo)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : `<span class="av-init">${esc((p.name || '?').trim()[0] || '?')}</span>`}</span>${filterPart === p.id ? '<span class="fil-badge">✓</span>' : ''}</span>
+    <span class="nm" onclick="openPartProfile('${p.id}')">${esc(p.name)}</span>${p.me ? '<span class="you-tag">вы</span>' : ''}</div>`).join('')
         : '';
       const partsBox = $('parts');
       if (partsBox) partsBox.insertAdjacentHTML('beforeend', `<button type="button" class="ps-add" onclick="openAddPart()" title="Добавить участника"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>`);
@@ -1910,6 +2015,12 @@
       }
       $('e-for').innerHTML = S.parts.map(p => `<span class="person on" data-i="${p.id}" onclick="toggleFor(this,'${p.id}')">${esc(p.name)}</span>`).join('');
       renderShareInputs();
+    }
+    function togglePartFilter(id) {
+      haptic();
+      filterPart = (filterPart === id) ? null : id;
+      renderParts();
+      renderExp();
     }
     function pickPayer(id, el) {
       haptic(); payerId = id;
@@ -1952,6 +2063,18 @@
       });
     }
     function toggleFor(el, i) { el.classList.toggle('on'); haptic(); if (splitMode === 'custom') renderShareInputs() }
+    function forPick(mode) {
+      haptic();
+      const chips = [...$('e-for').querySelectorAll('.person')];
+      if (mode === 'all') chips.forEach(c => c.classList.add('on'));
+      else if (mode === 'none') chips.forEach(c => c.classList.remove('on'));
+      else if (mode === 'me') {
+        const mePart = S.parts.find(p => p.me) || S.parts.find(p => p.id === myId);
+        const mid = mePart ? mePart.id : '';
+        chips.forEach(c => c.classList.toggle('on', c.dataset.i === mid));
+      }
+      if (splitMode === 'custom') renderShareInputs();
+    }
     function forSel() { const sel = [...$('e-for').querySelectorAll('.person.on')].map(x => x.dataset.i); return sel.length === S.parts.length ? [] : sel }
 
     /* ─── КАТЕГОРИИ ─── */
@@ -1984,6 +2107,7 @@
 
     /* ─── ТРАТЫ ─── */
     function addExpense() {
+      evalAmtInput($('e-amt'));
       const desc = $('e-desc').value.trim(), amt = parseNum($('e-amt').value);
       let payer = payerId;
       if (!desc) { toast('⚠️ Введите описание траты'); $('e-desc').focus(); return false }
@@ -2035,12 +2159,31 @@
       const sameYear = d.getFullYear() === new Date().getFullYear();
       return d.getDate() + ' ' + _MONTHS[d.getMonth()] + (sameYear ? '' : ' ' + d.getFullYear());
     }
+    function expInFilter(e) {
+      if (!filterPart) return true;
+      if (e.settled) return false; // складчины не привязаны к конкретному участнику
+      if (e.payer === filterPart) return true;
+      const f = e.for || [];
+      if (f.length && f.includes(filterPart)) return true;
+      if (!f.length) return true; // «на всех» — участник в их числе
+      return false;
+    }
     function renderExp() {
-      const box = $('exp-list'), tot = S.expenses.reduce((a, e) => a + (e.settled ? 0 : e.amt), 0);
+      const box = $('exp-list');
+      const visible = S.expenses.filter(expInFilter);
+      const tot = visible.reduce((a, e) => a + (e.settled ? 0 : e.amt), 0);
       $('spent-total').textContent = fmt(tot);
+      const fName = filterPart ? pName(filterPart) : '';
       if (!S.expenses.length) { box.innerHTML = `<div class="empty-state"><i data-lucide="receipt"></i><div class="msg">Вы ещё ничего не потратили.<br>Добавьте первый чек!</div><button class="btn ghost" onclick="openSheet()">+ Добавить трату</button></div>`; return }
+      if (filterPart && !visible.length) {
+        box.innerHTML = `<div class="empty-state" style="padding:22px 14px"><i data-lucide="search-x"></i><div class="msg">У ${esc(fName)} пока нет чеков</div><button class="btn ghost" onclick="togglePartFilter('${filterPart}')">✕ Показать все</button></div>`;
+        safeDrawIcons();
+        return;
+      }
+      let head = '';
+      if (filterPart) head = `<div class="filter-chip" onclick="togglePartFilter('${filterPart}')">🔍 ${esc(fName)} <span style="opacity:.6">✕</span></div>`;
       // Сортируем: свежие сверху; без даты (старые данные) — в конец
-      const sorted = [...S.expenses].sort((a, b) => ((b.ts || 0) - (a.ts || 0)));
+      const sorted = [...visible].sort((a, b) => ((b.ts || 0) - (a.ts || 0)));
       const groups = [];
       sorted.forEach(e => {
         const k = e.ts ? dayKey(e.ts) : '____';
@@ -2048,7 +2191,7 @@
         if (!g) { g = { k, label: e.ts ? dayLabel(k) : 'Ранее', items: [] }; groups.push(g); }
         g.items.push(e);
       });
-      box.innerHTML = groups.map(g => {
+      box.innerHTML = head + groups.map(g => {
         const rows = g.items.map(e => {
           if (e.settled) {
             return `<div class="exp-item">${e.cat ? `<span class="cat">${e.cat}</span>` : ''}<div class="txt" onclick="viewExp('${e.id}')"><div class="t">${esc(e.desc)}</div><div class="m">🤝 складчина · все внесли</div></div><div class="amt">${fmt(e.amt)}</div>
@@ -2059,7 +2202,7 @@
           return `<div class="exp-item">${e.cat ? `<span class="cat">${e.cat}</span>` : ''}<div class="txt" onclick="viewExp('${e.id}')"><div class="t">${esc(e.desc)}</div><div class="m">${esc(pName(e.payer))} · ${scope} · ${ml}</div></div><div class="amt">${fmt(e.amt)}</div>
       <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`;
         }).join('');
-        return (g.k !== '____' ? `<div class="day-hdr">${esc(g.label)}</div>` : `<div class="day-hdr">${esc(g.label)}</div>`) + rows;
+        return `<div class="day-hdr">${esc(g.label)}</div>` + rows;
       }).join('');
       safeDrawIcons();
     }
@@ -2331,6 +2474,7 @@
     function collPaidCount(c) { return Object.keys(c.paid || {}).length }
     function collDone(c) { return collPaidCount(c) >= (c.n || S.parts.length || 1) }
     function createColl() {
+      evalAmtInput($('c-amt'));
       const t = $('c-title').value.trim(), a = parseNum($('c-amt').value);
       if (!t) { toast('⚠️ Введите название сбора'); $('c-title').focus(); return }
       if (!a || a <= 0) { toast('⚠️ Введите сумму сбора больше 0'); $('c-amt').focus(); return }
@@ -2506,10 +2650,12 @@
       delPart(id);
     }
     function copyPay(id) {
+      haptic();
       const p = S.parts.find(x => x.id === id);
       if (!p || !p.pay) { toast('Нет реквизитов'); return; }
       navigator.clipboard?.writeText(p.pay);
-      toast('Реквизиты скопированы');
+      ok();
+      toast('Реквизиты ' + (p.name || 'получателя') + ' скопированы — откройте банк для перевода');
     }
 
     /* init */
