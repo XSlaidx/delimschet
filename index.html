@@ -1447,8 +1447,8 @@
       try {
         const { data } = await _supabase.from('rooms').select('state,updated_at').eq('id', S.roomId).single();
         if (data && data.state) {
-          const r = new Date(data.updated_at).getTime();
-          if (r > localStamp()) { applyRemote(data.state); toast('🔄 Данные из облака') }
+          const ts = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+          if (ts > localStamp()) { applyRemote(data.state, ts); toast('🔄 Данные из облака') }
         } else { await syncPush() }
       } catch (e) { }
       // Первый pull завершён: разблокируем авто-push. Если за время ожидания
@@ -1456,17 +1456,22 @@
       _syncReady = true;
       if (_dirtyWhileWaiting) { _dirtyWhileWaiting = false; if (_pushTimer) clearTimeout(_pushTimer); _pushTimer = setTimeout(syncPush, 300) }
     }
-    function applyRemote(st) {
+    function applyRemote(st, ts) {
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'SELECT')) {
-        setTimeout(() => applyRemote(st), 3000);
+        setTimeout(() => applyRemote(st, ts), 3000);
         return;
       }
+      const prev = JSON.stringify(S);
       S = mergeState(S, st);
       normalize();
-      _localStamp = Date.now();
+      // Серверное время события (commit_timestamp) — источник истины. Локальные часы
+      // для сравнений не используем: при рассинхроне чужие апдейты терялись.
+      if (ts && ts > _localStamp) _localStamp = ts;
+      const changed = JSON.stringify(S) !== prev;
       _saveOrig();
-      renderAll();
+      if (changed) { renderAll(); toast('🔄 Данные из облака') }
+      else { renderAll(); }
     }
     /* ─── УПРАВЛЕНИЕ КОМНАТАМИ ─── */
     function switchRoom(id) {
@@ -1589,7 +1594,12 @@
       if (!_supabase || !S.roomId || _realtime) return;
       _realtime = _supabase.channel('room:' + S.roomId)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + S.roomId }, p => {
-          if (p.new && p.new.state) { const r = new Date(p.new.updated_at).getTime(); if (r > localStamp()) applyRemote(p.new.state) }
+          if (p.new && p.new.state) {
+            // commit_timestamp — серверное время транзакции (источник истины, не локальные часы)
+            const ts = (p.commit_timestamp ? new Date(p.commit_timestamp).getTime() : 0) ||
+              (p.new.updated_at ? new Date(p.new.updated_at).getTime() : 0);
+            if (ts > localStamp()) applyRemote(p.new.state, ts)
+          }
         }).subscribe();
     }
     const _saveOrig = save;
