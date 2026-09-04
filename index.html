@@ -1678,6 +1678,7 @@
 
       // 1. ПРОВЕРКА НА ЗАВИСИМОСТИ (Участвует ли человек в деньгах?)
       const involvedInExp = S.expenses.some(e => {
+        if (e.settled) return false; // складчина: не завязана на конкретных людей и не влияет на долги
         if (e.payer === id) return true;
         const f = e.for || [];
         if (f.includes(id)) return true;
@@ -1759,14 +1760,18 @@
       });
     }
     function renderExp() {
-      const box = $('exp-list'), tot = S.expenses.reduce((a, e) => a + e.amt, 0);
+      const box = $('exp-list'), tot = S.expenses.reduce((a, e) => a + (e.settled ? 0 : e.amt), 0);
       $('spent-total').textContent = fmt(tot);
       if (!S.expenses.length) { box.innerHTML = `<div class="empty-state"><i data-lucide="receipt"></i><div class="msg">Вы ещё ничего не потратили.<br>Добавьте первый чек!</div><button class="btn ghost" onclick="openSheet()">+ Добавить трату</button></div>`; return }
       box.innerHTML = S.expenses.map(e => {
+        if (e.settled) {
+          return `<div class="exp-item">${e.cat ? `<span class="cat">${e.cat}</span>` : ''}<div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">🤝 складчина · все внесли поровну</div></div><div class="amt">${fmt(e.amt)}</div>
+      <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`;
+        }
         const scope = e.for.length ? e.for.map(id => pName(id)).join(', ') : 'все поровну';
         const ml = e.split === 'custom' ? '🎯 по долям' : '⚖️ поровну';
         return `<div class="exp-item">${e.cat ? `<span class="cat">${e.cat}</span>` : ''}<div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">${esc(pName(e.payer))} · ${scope} · ${ml}</div></div><div class="amt">${fmt(e.amt)}</div>
-      <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`
+      <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`;
       }).join('');
       safeDrawIcons();
     }
@@ -1776,6 +1781,7 @@
       const balCents = {};
       S.parts.forEach(p => balCents[p.id] = 0);
       S.expenses.forEach(e => {
+        if (e.settled) return; // складчина: все уже внесли свои доли — балансы не трогаем
         if (!(e.payer in balCents)) return;
         const ids = e.for.length ? e.for.filter(id => id in balCents) : S.parts.map(p => p.id);
         if (!ids.length) return;
@@ -1883,7 +1889,7 @@
     function copyDebts() {
       haptic(); const t = settle();
       let txt = '🧾 *«Делим Счёт» — долги*\n*Комната:* ' + S.roomId + '\n\n';
-      S.expenses.forEach(e => { txt += `• ${e.desc}: ${fmt(e.amt)} (${pName(e.payer)})\n` });
+      S.expenses.forEach(e => { txt += e.settled ? `• ${e.desc}: ${fmt(e.amt)} (складчина, все внесли)\n` : `• ${e.desc}: ${fmt(e.amt)} (${pName(e.payer)})\n` });
       txt += '\n*Переводы:*\n'; if (!t.length) txt += 'Все в расчёте ✅\n'; else t.forEach(x => { txt += `• ${pName(x.from)} → ${pName(x.to)}: ${fmt(x.amt)}\n` });
       txt += '\nОткрыть: ' + getDeepLink();
       if (navigator.clipboard) navigator.clipboard.writeText(txt); ok(); toast('Долги скопированы')
@@ -2002,8 +2008,11 @@
       haptic(); const c = S.colls.find(x => x.id === cid); if (!c) return;
       const payers = Object.keys(c.paid);
       if (!payers.length) { toast('Отметьте, кто внёс'); return }
-      S.expenses.push({ id: nid(), desc: c.title, amt: c.target, payer: payers[0], for: [], split: 'equal', shares: null, cat: '💰' });
-      save(); renderAll(); ok(); toast('Добавлено в траты')
+      // Складчина: каждый отметившийся уже внёс свою долю — долгов не возникает.
+      // «→ В траты» лишь фиксирует покупку в общем списке, не трогая балансы.
+      S.expenses.unshift({ id: nid(), desc: c.title, amt: c.target, payer: '', for: [], split: 'equal', shares: null, cat: '💰', settled: true });
+      c.converted = true;
+      save(); renderAll(); ok(); logEvent('🤝 Складчина «' + c.title + '» — ' + fmt(c.target) + ' — все внесли, долгов нет'); toast('Покупка добавлена в траты')
     }
     function renderColls() {
       const box = $('coll-list');
@@ -2020,7 +2029,7 @@
           return `<span class="person ${isPaid ? 'paid' : ''}" onclick="togglePaid('${c.id}','${p.id}')">${isPaid ? '✓' : '○'} ${esc(p.name)}${isPaid ? ' · ' + fmt(c.target / Math.max(1, S.parts.length)) : ''}</span>`
         }).join('')}</div>
       <div class="dl" style="margin-top:10px">
-        ${done ? `<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense('${c.id}')">→ В траты</button>` : ''}
+        ${!c.converted && done ? `<button class="btn ghost green" style="color:var(--green)" onclick="collToExpense('${c.id}')">→ В траты</button>` : (c.converted ? '<span class="pill done" style="margin:auto 0">✅ в тратах</span>' : '')}
         <button class="icobtn" style="margin-left:auto" onclick="delColl('${c.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div></div>`
       }).join('')
     }
