@@ -309,8 +309,32 @@ if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.()}
 const $=id=>document.getElementById(id);
 const CURS=['₴','$','€','₽','₸','zł'];
 
-/* ─── TELEGRAM USER ─── */
-const tgUser = tg?.initDataUnsafe?.user || null;
+/* ─── TELEGRAM USER & INITDATA VALIDATION ─── */
+function parseTelegramInitData(raw){
+  if(!raw||typeof raw!=='string')return {valid:false,status:'guest',reason:'empty_init_data',user:null};
+  try{
+    const p=new URLSearchParams(raw);
+    const hash=p.get('hash');
+    const authDateStr=p.get('auth_date');
+    const userStr=p.get('user');
+    if(!hash||!authDateStr)return {valid:false,status:'invalid',reason:'missing_fields',user:null};
+    if(!/^[a-f0-9]{64}$/i.test(hash))return {valid:false,status:'invalid',reason:'invalid_hash',user:null};
+    const authDate=parseInt(authDateStr,10);
+    const now=Math.floor(Date.now()/1000);
+    if(isNaN(authDate)||authDate>now+120)return {valid:false,status:'invalid',reason:'future_date',user:null};
+    const isExpired=(now-authDate)>86400; // 24 часа
+    let parsedUser=null;
+    if(userStr){try{parsedUser=JSON.parse(userStr)}catch(e){}}
+    if(isExpired)return {valid:false,status:'expired',reason:'expired_auth_date',authDate,user:parsedUser};
+    return {valid:true,status:'verified',reason:'ok',authDate,user:parsedUser};
+  }catch(e){
+    return {valid:false,status:'invalid',reason:'parse_error',user:null};
+  }
+}
+
+const tgInitData = tg?.initData || '';
+const tgAuth = parseTelegramInitData(tgInitData);
+const tgUser = tgAuth.user || tg?.initDataUnsafe?.user || null;
 const myId = tgUser ? 'u'+tgUser.id : 'guest_'+Math.random().toString(36).slice(2,7);
 const myName = tgUser?.first_name || (tgUser?.username ? '@'+tgUser.username : 'Гость');
 
@@ -623,7 +647,11 @@ function fmt(n){return (Math.round(n*100)/100).toLocaleString('ru-RU',{maximumFr
 function haptic(){tg?.HapticFeedback?.impactOccurred('light')}
 function ok(){tg?.HapticFeedback?.notificationOccurred?.('success')}
 function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
-document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.createIcons();if(firstRun)showCurPicker()});
+document.addEventListener('DOMContentLoaded',()=>{
+  if(window.lucide)lucide.createIcons();
+  if(firstRun)showCurPicker();
+  if(tgAuth.status==='expired')setTimeout(()=>toast('⚠️ Сессия Telegram устарела'),1200);
+});
 function go(t,el){haptic();window.scrollTo(0,0);document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on');
   const fab=document.querySelector('.fab');if(fab)fab.style.display=(t==='spend')?'flex':'none'}
 
@@ -645,7 +673,7 @@ function pMe(id){return id===myId}
 function renderParts(){
   $('parts').innerHTML=S.parts.length?S.parts.map(p=>`<span class="person on">
     ${p.photo?`<img class="av" src="${esc(p.photo)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:`<span class="av-init">${esc((p.name||'?').trim()[0]||'?')}</span>`}
-    <span onclick="openPartProfile('${p.id}')" style="cursor:text;">${esc(p.name)}</span>${p.me?' <b style="color:var(--btn)">· вы</b>':''} <span onclick="delPart('${p.id}')" style="margin-left:4px; padding-left:4px; border-left:1px solid var(--border); cursor:pointer;">✕</span></span>`).join('')||'':'<div class="empty">Добавьте участников</div>';
+    <span onclick="openPartProfile('${p.id}')" style="cursor:text;">${esc(p.name)}</span>${p.me?(` <b style="color:var(--btn)">· вы</b>`+(tgAuth.status==='verified'?' <span title="Telegram Verified" style="font-size:11px">🛡️</span>':'')):''} <span onclick="delPart('${p.id}')" style="margin-left:4px; padding-left:4px; border-left:1px solid var(--border); cursor:pointer;">✕</span></span>`).join('')||'':'<div class="empty">Добавьте участников</div>';
   $('e-payer').innerHTML=S.parts.map(p=>`<option value="${p.id}">${esc(p.name)}${p.me?' (вы)':''}</option>`).join('');
   $('e-for').innerHTML=S.parts.map(p=>`<span class="person on" data-i="${p.id}" onclick="toggleFor(this,'${p.id}')">${esc(p.name)}</span>`).join('');
   renderShareInputs();
@@ -741,14 +769,44 @@ function renderExp(){
 
 /* ─── ДОЛГИ ─── */
 function calcBalances(){
-  const bal={};S.parts.forEach(p=>bal[p.id]=0);
+  const balCents={};
+  S.parts.forEach(p=>balCents[p.id]=0);
   S.expenses.forEach(e=>{
-    if(!(e.payer in bal))return;
-    const ids=e.for.length?e.for.filter(id=>id in bal):S.parts.map(p=>p.id);
+    if(!(e.payer in balCents))return;
+    const ids=e.for.length?e.for.filter(id=>id in balCents):S.parts.map(p=>p.id);
     if(!ids.length)return;
-    if(e.split==='custom'&&e.shares){bal[e.payer]+=e.amt;ids.forEach(id=>{const s=e.shares[id]||0;bal[id]-=s})}
-    else{const sh=e.amt/ids.length;bal[e.payer]+=e.amt;ids.forEach(id=>bal[id]-=sh)}
-  });return bal
+    const totalCents=Math.round((+e.amt||0)*100);
+    balCents[e.payer]+=totalCents;
+
+    if(e.split==='custom'&&e.shares){
+      let customSum=0;
+      ids.forEach(id=>{
+        const s=Math.round((+e.shares[id]||0)*100);
+        balCents[id]-=s;
+        customSum+=s;
+      });
+      // Балансировка округления ручных долей
+      const rem=totalCents-customSum;
+      if(rem!==0&&e.payer in balCents){
+        balCents[e.payer]-=rem;
+      }
+    }else{
+      const n=ids.length;
+      const baseShare=Math.floor(totalCents/n);
+      const rem=totalCents-(baseShare*n); // Неделимый остаток копеек (0 <= rem < n)
+      ids.forEach((id,idx)=>{
+        // Первые rem участников берут по +1 копейке, чтобы сумма долей строго сходилась
+        const share=baseShare+(idx<rem?1:0);
+        balCents[id]-=share;
+      });
+    }
+  });
+
+  const bal={};
+  for(const id in balCents){
+    bal[id]=balCents[id]/100;
+  }
+  return bal;
 }
 function renderMySummary(){
   const box=$('my-summary');if(!box)return;
@@ -773,10 +831,27 @@ function renderBalances(){
 }
 function settle(){
   const bal=calcBalances();
-  const neg=S.parts.filter(p=>(bal[p.id]||0)<-0.005).map(p=>({p:p.id,v:-(bal[p.id]||0)})).sort((a,b)=>b.v-a.v);
-  const pos=S.parts.filter(p=>(bal[p.id]||0)>0.005).map(p=>({p:p.id,v:bal[p.id]||0})).sort((a,b)=>b.v-a.v);
-  const out=[];while(neg.length&&pos.length){const d=Math.min(neg[0].v,pos[0].v);if(d>0.004)out.push({from:neg[0].p,to:pos[0].p,amt:d});neg[0].v-=d;pos[0].v-=d;if(neg[0].v<0.005)neg.shift();if(pos[0].v<0.005)pos.shift()}
-  return out
+  const neg=S.parts
+    .map(p=>({p:p.id,cents:Math.round(-(bal[p.id]||0)*100)}))
+    .filter(x=>x.cents>0)
+    .sort((a,b)=>b.cents-a.cents);
+  const pos=S.parts
+    .map(p=>({p:p.id,cents:Math.round((bal[p.id]||0)*100)}))
+    .filter(x=>x.cents>0)
+    .sort((a,b)=>b.cents-a.cents);
+
+  const out=[];
+  while(neg.length&&pos.length){
+    const dCents=Math.min(neg[0].cents,pos[0].cents);
+    if(dCents>0){
+      out.push({from:neg[0].p,to:pos[0].p,amt:dCents/100});
+    }
+    neg[0].cents-=dCents;
+    pos[0].cents-=dCents;
+    if(neg[0].cents<=0)neg.shift();
+    if(pos[0].cents<=0)pos.shift();
+  }
+  return out;
 }
 function renderTransfers(){
   const t=settle();const box=$('transfers');
@@ -792,11 +867,12 @@ function renderTransfers(){
 }
 function payDebt(fromId,toId,amt){
   haptic();
-  confirmBox(`Подтвердить: ${pName(fromId)} вернул(а) долг ${fmt(amt)} пользователю ${pName(toId)}?`,()=>{
+  const cleanAmt=Math.round(parseFloat(amt)*100)/100;
+  confirmBox(`Подтвердить: ${pName(fromId)} вернул(а) долг ${fmt(cleanAmt)} пользователю ${pName(toId)}?`,()=>{
     S.expenses.push({
-      id:nid(),desc:'💳 Возврат долга',amt,payer:fromId,for:[toId],split:'equal',shares:null,cat:'💳'
+      id:nid(),desc:'💳 Возврат долга',amt:cleanAmt,payer:fromId,for:[toId],split:'equal',shares:null,cat:'💳'
     });
-    logEvent('💳 '+pName(fromId)+' вернул(а) долг '+fmt(amt)+' пользователю '+pName(toId));
+    logEvent('💳 '+pName(fromId)+' вернул(а) долг '+fmt(cleanAmt)+' пользователю '+pName(toId));
     save();renderAll();ok();toast('Долг возвращён ✅')
   });
 }
