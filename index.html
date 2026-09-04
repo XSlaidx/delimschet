@@ -247,7 +247,18 @@ input[type=number]{appearance:textfield}
     </div>
     <div id="p-fundhint" style="display:none" class="sub">У каждого варианта есть цена.</div>
     <label>Варианты</label>
-    <div id="p-opts"></div>
+    <div id="p-opts">
+      <div style="display:flex; gap:7px; margin-bottom:7px;">
+        <input type="text" placeholder="Вариант" style="flex:2">
+        <input type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" style="flex:1; width:80px; display:none">
+        <button type="button" class="icobtn" style="flex:0" onclick="this.parentElement.remove()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+      <div style="display:flex; gap:7px; margin-bottom:7px;">
+        <input type="text" placeholder="Вариант" style="flex:2">
+        <input type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" style="flex:1; width:80px; display:none">
+        <button type="button" class="icobtn" style="flex:0" onclick="this.parentElement.remove()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+    </div>
     <button class="btn ghost" onclick="addPOpt()" style="margin-bottom:6px"><i data-lucide="plus" style="width:15px;height:15px"></i> Вариант</button>
     <button class="btn" onclick="createPoll();closeSheet()">Создать опрос</button>
   </div>
@@ -603,7 +614,9 @@ function haptic(){tg?.HapticFeedback?.impactOccurred('light')}
 function ok(){tg?.HapticFeedback?.notificationOccurred?.('success')}
 function toast(t){$('tt').textContent=t;const el=$('toast');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 document.addEventListener('DOMContentLoaded',()=>{if(window.lucide)lucide.createIcons();if(firstRun)showCurPicker()});
-function go(t,el){haptic();window.scrollTo(0,0);document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
+function go(t,el){haptic();window.scrollTo(0,0);document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));$('tab-'+t).classList.add('active');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));el.classList.add('on');
+  const fab=document.querySelector('.fab');if(fab)fab.style.display=(t==='spend')?'flex':'none'}
+  const fab=document.querySelector('.fab');if(fab)fab.style.display=(t==='spend')?'flex':'none'}
 
 /* ─── КОМНАТА / ПРИГЛАШЕНИЕ ─── */
 const BOT_USERNAME = "delimschet_bot"
