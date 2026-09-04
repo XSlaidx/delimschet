@@ -1430,6 +1430,9 @@
     const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
     const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
     let _supabase = null, _realtime = null, _pushTimer = null, _localStamp = 0;
+    // Гейт первого push: до завершения первого syncPull не пушим ничего в облако,
+    // иначе пустая локальная касса нового участника затрёт существующую комнату.
+    let _syncReady = false, _dirtyWhileWaiting = false;
     try { if (window.supabase?.createClient) _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON) } catch (e) { console.warn('Supabase warn:', e) }
     function localStamp() { return _localStamp }
     async function syncPush() {
@@ -1440,7 +1443,7 @@
       } catch (e) { }
     }
     async function syncPull() {
-      if (!_supabase || !S.roomId) return;
+      if (!_supabase || !S.roomId) { _syncReady = true; return; }
       try {
         const { data } = await _supabase.from('rooms').select('state,updated_at').eq('id', S.roomId).single();
         if (data && data.state) {
@@ -1448,6 +1451,10 @@
           if (r > localStamp()) { applyRemote(data.state); toast('🔄 Данные из облака') }
         } else { await syncPush() }
       } catch (e) { }
+      // Первый pull завершён: разблокируем авто-push. Если за время ожидания
+      // были локальные изменения — отправляем их сейчас.
+      _syncReady = true;
+      if (_dirtyWhileWaiting) { _dirtyWhileWaiting = false; if (_pushTimer) clearTimeout(_pushTimer); _pushTimer = setTimeout(syncPush, 300) }
     }
     function applyRemote(st) {
       const a = document.activeElement;
@@ -1586,7 +1593,11 @@
         }).subscribe();
     }
     const _saveOrig = save;
-    save = function () { _saveOrig(); if (_pushTimer) clearTimeout(_pushTimer); _pushTimer = setTimeout(syncPush, 700) };
+    save = function () {
+      _saveOrig();
+      if (!_syncReady) { _dirtyWhileWaiting = true; return; }
+      if (_pushTimer) clearTimeout(_pushTimer); _pushTimer = setTimeout(syncPush, 700)
+    };
 
     /* ─── СОБЫТИЯ ДЛЯ БОТА ─── */
     async function logEvent(text) {
@@ -1666,11 +1677,16 @@
       if (pMe(id)) { toast('Это вы — себя нельзя удалить'); return }
 
       // 1. ПРОВЕРКА НА ЗАВИСИМОСТИ (Участвует ли человек в деньгах?)
-      const involvedInExp = S.expenses.some(e =>
-        e.payer === id ||
-        e.for.includes(id) ||
-        (e.shares && e.shares[id] !== undefined)
-      );
+      const involvedInExp = S.expenses.some(e => {
+        if (e.payer === id) return true;
+        const f = e.for || [];
+        if (f.includes(id)) return true;
+        // Трата «на всех поровну» (for пуст) завязана на КАЖДОГО участника:
+        // удаление любого пересчитает прошлые долги на оставшихся.
+        if (!f.length) return true;
+        if (e.shares && e.shares[id] !== undefined) return true;
+        return false;
+      });
       const involvedInColl = S.colls.some(c => c.paid && c.paid[id]);
 
       if (involvedInExp || involvedInColl) {
