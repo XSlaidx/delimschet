@@ -23,7 +23,7 @@
     function forceHardReload() {
       try {
         const u = new URL(window.location.href);
-        u.searchParams.set('_v', '1.10_' + Date.now());
+        u.searchParams.set('_v', '1.11_' + Date.now());
         window.location.href = u.toString();
       } catch (e) {
         window.location.reload(true);
@@ -43,7 +43,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2?t=8"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js?t=8"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1?t=8"></script>
-  <link rel="stylesheet" href="css/app.css?v=1.10">
+  <link rel="stylesheet" href="css/app.css?v=1.11">
 </head>
 
 <body>
@@ -55,7 +55,7 @@
 
   <header>
     <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Нажмите для сброса кэша"
-        onclick="forceHardReload()" style="cursor:pointer">v1.10 ↻</span></div>
+        onclick="forceHardReload()" style="cursor:pointer">v1.11 ↻</span></div>
     <div class="head-acts">
       <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая
         касса</span>
@@ -282,7 +282,7 @@
     <button class="nav" onclick="go('collect',this)"><i data-lucide="piggy-bank"></i>Сборы</button>
   </nav>
 
-  <script src="js/app.js?v=1.10"></script>
+  <script src="js/app.js?v=1.11"></script>
   <!-- ОВЕРЛЕЙ ПРОФИЛЬ УЧАСТНИКА -->
   <div id="part-overlay" class="overlay" style="display:none">
     <div class="overlay-box">
