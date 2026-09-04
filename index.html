@@ -1,6 +1,33 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<script>
+window.__ERRORS = [];
+window.onerror = function(msg, src, line, col, err) {
+  var text = '⚠️ JS: ' + msg + ' (L' + line + ')';
+  window.__ERRORS.push(text);
+  var bar = document.getElementById('debug-bar');
+  if (bar) { bar.style.display = 'block'; bar.textContent = text; }
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var text = '⚠️ Promise: ' + (e.reason?.message || e.reason || 'Rejection');
+  window.__ERRORS.push(text);
+  var bar = document.getElementById('debug-bar');
+  if (bar) { bar.style.display = 'block'; bar.textContent = text; }
+});
+function forceHardReload(){
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set('_v', '1.6_' + Date.now());
+    window.location.href = u.toString();
+  } catch(e) {
+    window.location.reload(true);
+  }
+}
+function safeDrawIcons(){
+  try{window.lucide?.createIcons?.()}catch(e){}
+}
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -142,11 +169,11 @@ input[type=number]{appearance:textfield}
 <div id="toast" class="toast"><span id="tt">Готово</span></div>
 
 <header>
-  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Версия">v1.5</span></div>
+  <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Нажмите для сброса кэша" onclick="forceHardReload()" style="cursor:pointer">v1.6 ↻</span></div>
   <div class="head-acts">
     <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая касса</span>
     <span class="cur-chip" id="cur-chip" onclick="showCurPicker()">₴</span>
-    <button class="icobtn" onclick="location.reload(true)" title="Обновить страницу" style="color:var(--hint)"><i data-lucide="rotate-cw" style="width:16px;height:16px"></i></button>
+    <button class="icobtn" onclick="forceHardReload()" title="Сбросить кэш Telegram и обновить" style="color:var(--btn)"><i data-lucide="rotate-cw" style="width:16px;height:16px"></i></button>
     <button class="icobtn blue" onclick="openRooms()" title="Мои кассы"><i data-lucide="layers"></i></button>
     <button class="icobtn blue" onclick="inviteRoom()" title="Пригласить"><i data-lucide="share-2"></i></button>
   </div>
@@ -184,7 +211,7 @@ input[type=number]{appearance:textfield}
     <span class="cat-chip" data-c="🎟️" onclick="pickCat(this,'🎟️')">🎟️ Развлечения</span>
   </div>
   <label>Сумма</label>
-  <input type="number" inputmode="decimal" id="e-amt" placeholder="0" min="0" step="0.01" oninput="onAmtChange()">
+  <input type="text" inputmode="decimal" id="e-amt" placeholder="0" autocomplete="off" oninput="onAmtChange()">
   <label>Кто заплатил</label>
   <select id="e-payer"></select>
   <label>Режим</label>
@@ -294,7 +321,7 @@ input[type=number]{appearance:textfield}
     <label>На что</label>
     <input type="text" id="c-title" placeholder="Напр: подарок">
     <label>Сумма</label>
-    <input type="number" inputmode="decimal" id="c-amt" placeholder="0" min="0" step="0.01">
+    <input type="text" inputmode="decimal" id="c-amt" placeholder="0" autocomplete="off">
     <button class="btn" onclick="createColl()">Начать сбор</button>
   </div>
   <div id="coll-list"></div>
@@ -315,9 +342,17 @@ input[type=number]{appearance:textfield}
 </nav>
 
 <script>
+function safeDrawIcons(){try{window.lucide?.createIcons?.()}catch(e){}}
 const tg=window.Telegram?.WebApp;
 if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.()}
 const $=id=>document.getElementById(id);
+function parseNum(val){
+  if(val===null||val===undefined)return 0;
+  const s=String(val).replace(/\s/g,'').replace(',','.').trim();
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+
 const CURS=['₴','$','€','₽','₸','zł'];
 
 /* ─── TELEGRAM USER & INITDATA VALIDATION ─── */
@@ -482,7 +517,7 @@ function quickAddPart(name){
 const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
 let _supabase=null,_realtime=null,_pushTimer=null,_localStamp=0;
-try{_supabase=supabase.createClient(SUPABASE_URL,SUPABASE_ANON)}catch(e){}
+try{if(window.supabase?.createClient)_supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON)}catch(e){console.warn('Supabase warn:',e)}
 function localStamp(){return _localStamp}
 async function syncPush(){
   if(!_supabase||!S.roomId)return;
@@ -668,7 +703,7 @@ window.addEventListener('unhandledrejection',function(e){
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
 document.addEventListener('DOMContentLoaded',()=>{
-  if(window.lucide)try{lucide.createIcons()}catch(e){}
+  safeDrawIcons();
   if(firstRun)showCurPicker();
   if(tgAuth.status==='expired')setTimeout(()=>toast('⚠️ Сессия Telegram устарела'),1200);
   // Резервные слушатели для режима опросов
@@ -738,7 +773,7 @@ function pickCat(el,c){haptic();document.querySelectorAll('#cat-grid .cat-chip')
 function setSplitMode(m){haptic();splitMode=m;$('mode-eq').classList.toggle('on',m==='equal');$('mode-cs').classList.toggle('on',m==='custom');$('split-custom').style.display=m==='custom'?'block':'none';if(m==='custom')renderShareInputs()}
 function onAmtChange(){if(splitMode==='custom')renderShareInputs()}
 function renderShareInputs(){
-  const box=$('share-inputs'),amt=parseFloat($('e-amt').value)||0;
+  const box=$('share-inputs'),amt=parseNum($('e-amt').value);
   const ids=forSel();const parts=ids.length?ids.filter(id=>S.parts.some(p=>p.id===id)):S.parts.map(p=>p.id);
   if(!parts.length||splitMode!=='custom'){box.innerHTML='';return}
   const n=parts.length;const def=Math.round(amt/n*100)/100;const rem=Math.round((amt-def*(n-1))*100)/100;
@@ -761,7 +796,7 @@ function getShares(){
 
 /* ─── ТРАТЫ ─── */
 function addExpense(){
-  const desc=$('e-desc').value.trim(),amt=parseFloat($('e-amt').value);
+  const desc=$('e-desc').value.trim(),amt=parseNum($('e-amt').value);
   let payer=$('e-payer').value;
   if(!desc){toast('⚠️ Введите описание траты');$('e-desc').focus();return false}
   if(!amt||amt<=0){toast('⚠️ Введите сумму больше 0');$('e-amt').focus();return false}
@@ -795,7 +830,7 @@ function renderExp(){
     return `<div class="exp-item">${e.cat?`<span class="cat">${e.cat}</span>`:''}<div class="txt"><div class="t">${esc(e.desc)}</div><div class="m">${esc(pName(e.payer))} · ${scope} · ${ml}</div></div><div class="amt">${fmt(e.amt)}</div>
       <button class="icobtn" onclick="delExp('${e.id}')"><i data-lucide="trash-2" style="width:16px;height:16px"></i></button></div>`
   }).join('');
-  if(window.lucide)lucide.createIcons();
+  safeDrawIcons();
 }
 
 /* ─── ДОЛГИ ─── */
@@ -932,7 +967,7 @@ function addPOpt(v='',price=''){
   d.innerHTML=`<input type="text" placeholder="Вариант" value="${esc(v)}" style="flex:2">
     <input type="number" inputmode="decimal" placeholder="${pMode==='fund'?'Цена':'0'}" value="${price}" min="0" step="0.01" style="flex:1;width:80px;${pMode==='fund'?'':'display:none'}">
     <button class="icobtn" style="flex:0" onclick="this.parentElement.remove()"><i data-lucide="x" style="width:15px;height:15px"></i></button>`;
-  $('p-opts').appendChild(d);if(window.lucide)lucide.createIcons()
+  $('p-opts').appendChild(d);safeDrawIcons();
 }
 function pollOptsPriceVis(){document.querySelectorAll('#p-opts > div').forEach(d=>{const t=d.querySelector('input[type=text]');const n=d.querySelector('input[type=number]');if(n){n.style.display=pMode==='fund'?'':'none';n.placeholder=pMode==='fund'?'Цена':'0'}})}
 
@@ -981,7 +1016,7 @@ function pollToCollect(id){
     S.colls.unshift({id:nid(),title:`${p.q} — ${opt.t}`,target:opt.pr,paid:{}});
     save();renderAll();ok();
     // 🎊 Конфетти
-    if(window.confetti)confetti({particleCount:120,spread:70,origin:{y:0.6}});
+    try{window.confetti?.({particleCount:120,spread:70,origin:{y:0.6}})}catch(e){}
     logEvent('💰 Сбор на «'+p.q+' — '+opt.t+'» — '+fmt(opt.pr));toast('Сбор создан на '+fmt(opt.pr))
   });
 }
@@ -1009,7 +1044,7 @@ function renderPolls(){
 
 /* ─── СБОРЫ ─── */
 function createColl(){
-  const t=$('c-title').value.trim(),a=parseFloat($('c-amt').value);
+  const t=$('c-title').value.trim(),a=parseNum($('c-amt').value);
   if(!t){toast('⚠️ Введите название сбора');$('c-title').focus();return}
   if(!a||a<=0){toast('⚠️ Введите сумму сбора больше 0');$('c-amt').focus();return}
   S.colls.unshift({id:nid(),title:t,target:a,paid:{}});
@@ -1072,7 +1107,7 @@ function openSheet(type='expense'){
   if(firstCat)firstCat.classList.add('on');
   setSplitMode('equal');
   renderParts();
-  if(window.lucide)try{lucide.createIcons()}catch(e){}
+  safeDrawIcons();
 }
 function closeSheet(){
   try{haptic()}catch(e){}
@@ -1095,7 +1130,7 @@ function renderAll(){
   renderParts();renderExp();renderBalances();renderTransfers();renderPolls();renderColls();
   renderQuickAdd();
   renderMySummary();
-  if(window.lucide)lucide.createIcons();
+  safeDrawIcons();
 }
 /* ─── ПЕРЕИМЕНОВАНИЕ ─── */
 function renamePart(id){
@@ -1206,7 +1241,7 @@ setTimeout(()=>{syncPull();subscribeRoom()},900);
 </body>
 <script>
 // Гарантируем отрисовку иконок даже если lucide загрузился после DOMContentLoaded
-function _drawIcons(){if(window.lucide)try{lucide.createIcons()}catch(e){}}
+function _drawIcons(){safeDrawIcons();}
 window.addEventListener('load',_drawIcons);
 if(document.readyState==='complete')_drawIcons();
 // повтор через тик, чтобы перехватить позднюю загрузку CDN
