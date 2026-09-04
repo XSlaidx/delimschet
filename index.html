@@ -435,7 +435,7 @@ if(sharedUrlRoom){
     if(!migrated){const id=genRoomId();S=newState(id,'Общая касса');ROOMS.current=id;ROOMS.rooms[id]=S;ROOMS.meta[id]={name:'Общая касса',date:Date.now()};}
   }
 }
-const firstRun=!S.parts.length;
+const firstRun = !S || !S.parts?.length;
 
 
 let pMode='plain',splitMode='equal',curCat='';
