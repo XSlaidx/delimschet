@@ -1,3 +1,11 @@
+    /* ═══════════════════════════════════════════════════════
+       КОНФИГУРАЦИЯ ПРИЛОЖЕНИЯ (шапка)
+       Supabase: project + anon-ключ (публичный, для клиента).
+       Таблицы: rooms(id, state jsonb, updated_at), events(...).
+       ═══════════════════════════════════════════════════════ */
+    const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
+
     const tg = window.Telegram?.WebApp;
     // Реальная Telegram-сессия: initData заполнен только внутри Telegram WebApp.
     // В обычном браузере WebApp-объект есть, но его методы (showConfirm и т.п.)
@@ -267,8 +275,6 @@
       S.parts.push({ id: nid(), name }); save(); renderAll(); ok(); toast('Участник добавлен');
       setTimeout(() => { renderQuickAdd(); $('new-part').focus() }, 50);
     }
-    const SUPABASE_URL = "https://cfopzdkyljfdkjksatss.supabase.co";
-    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb3B6ZGt5bGpmZGtqa3NhdHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjQ2MzcsImV4cCI6MjA4MDUwMDYzN30.yArvoJKKTC0RSTLUyxIZqLhV4nu1lW6I31vAfeWJJ38";
     let _supabase = null, _realtime = null, _pushTimer = null, _localStamp = 0;
     // Гейт первого push: до завершения первого syncPull не пушим ничего в облако,
     // иначе пустая локальная касса нового участника затрёт существующую комнату.
@@ -507,8 +513,6 @@
       if (IS_TG && tg && typeof tg.openTelegramLink === 'function') { try { tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(msg)); ok() } catch (e) { navigator.clipboard?.writeText(url + '\n' + msg); toast('Ссылка скопирована') } }
       else { navigator.clipboard?.writeText(url + '\n' + msg); toast('Ссылка скопирована') }
     }
-    function copyRoomId() { haptic(); navigator.clipboard?.writeText(getDeepLink()); toast('Ссылка скопирована') }
-    function getRoomUrl() { return getDeepLink() }
 
     /* ─── УЧАСТНИКИ ─── */
     function pName(id) { const p = S.parts.find(x => x.id === id); return p ? p.name : id }
@@ -1042,10 +1046,8 @@
     }
 
     /* ─── SHEET / FAB ─── */
-    let sheetType = '';
     function openSheet(type = 'expense', editExp) {
       try { haptic() } catch (e) { }
-      sheetType = type;
       const sh = $('exp-sheet');
       if (sh) sh.classList.add('on');
       const bd = $('sheet-backdrop');
@@ -1126,19 +1128,6 @@
       renderQuickAdd();
       renderMySummary();
       safeDrawIcons();
-    }
-    /* ─── ПЕРЕИМЕНОВАНИЕ ─── */
-    function renamePart(id) {
-      haptic();
-      const p = S.parts.find(x => x.id === id);
-      if (!p) return;
-      $('rename-input').value = p.name;
-      $('rename-overlay').style.display = 'flex';
-      $('rename-save-btn').onclick = () => {
-        const newName = $('rename-input').value.trim();
-        if (newName) { p.name = newName; save(); renderAll(); toast('Имя изменено') }
-        $('rename-overlay').style.display = 'none';
-      };
     }
     let _partEditId = null;
     function openPartProfile(id) {
