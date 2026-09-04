@@ -19,7 +19,7 @@
     function forceHardReload() {
       try {
         const u = new URL(window.location.href);
-        u.searchParams.set('_v', '1.6_' + Date.now());
+        u.searchParams.set('_v', '1.8_' + Date.now());
         window.location.href = u.toString();
       } catch (e) {
         window.location.reload(true);
@@ -1006,7 +1006,7 @@
 
   <header>
     <div class="brand"><span class="ic">💰</span>Делим Счёт<span class="badge" title="Нажмите для сброса кэша"
-        onclick="forceHardReload()" style="cursor:pointer">v1.7 ↻</span></div>
+        onclick="forceHardReload()" style="cursor:pointer">v1.8 ↻</span></div>
     <div class="head-acts">
       <span class="room-name-tag" id="room-name" onclick="openRenameRoom()" title="Переименовать кассу">Общая
         касса</span>
@@ -1216,7 +1216,11 @@
   <script>
     function safeDrawIcons() { try { window.lucide?.createIcons?.() } catch (e) { } }
     const tg = window.Telegram?.WebApp;
-    if (tg) { tg.ready(); tg.expand(); tg.disableVerticalSwipes?.() }
+    // Реальная Telegram-сессия: initData заполнен только внутри Telegram WebApp.
+    // В обычном браузере WebApp-объект есть, но его методы (showConfirm и т.п.)
+    // падают внутри кросс-доменного telegram.org скрипта с маскированной "Script error."
+    const IS_TG = !!(tg && (tg.initData || window.TelegramWebviewProxy));
+    if (tg) { try { tg.ready() } catch (e) { } try { tg.expand() } catch (e) { } try { tg.disableVerticalSwipes?.() } catch (e) { } }
     const $ = id => document.getElementById(id);
     function parseNum(val) {
       if (val === null || val === undefined) return 0;
@@ -1602,9 +1606,16 @@
     function haptic() { try { tg?.HapticFeedback?.impactOccurred?.('light') } catch (e) { } }
     function ok() { try { tg?.HapticFeedback?.notificationOccurred?.('success') } catch (e) { } }
     function toast(t) { $('tt').textContent = t; const el = $('toast'); el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2200) }
-    window.onerror = function (msg, src, line) {
+    window.onerror = function (msg, src, line, col, err) {
       const bar = document.getElementById('debug-bar');
-      if (bar) { bar.style.display = 'block'; bar.textContent = '⚠️ JS Error: ' + msg + ' (line ' + line + ')'; }
+      if (bar) {
+        bar.style.display = 'block';
+        // «Script error.» — кросс-доменная ошибка, детали скрыты. Пытаемся достать реальную из event.error
+        const detail = (err && (err.message || err.stack)) ? (err.stack || err.message) : null;
+        bar.textContent = detail
+          ? '⚠️ JS Error: ' + String(detail).split('\n')[0] + ' @' + (src ? src.split('/').pop() : '?') + ':' + line
+          : '⚠️ JS Error: ' + msg + ' (' + (src ? src.split('/').pop() : 'line') + ':' + line + ')';
+      }
     };
     window.addEventListener('unhandledrejection', function (e) {
       const bar = document.getElementById('debug-bar');
@@ -1631,7 +1642,7 @@
     function getDeepLink() { return `https://t.me/${BOT_USERNAME}/${APP_SHORT_NAME}?startapp=${encodeURIComponent(S.roomId)}` }
     function inviteRoom() {
       haptic(); const url = getDeepLink(); const msg = '💰 Присоединяйся к «Делим Счёт»! Комната: ' + S.roomId;
-      if (tg && tg.openTelegramLink) { tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(msg)); ok() }
+      if (IS_TG && tg && typeof tg.openTelegramLink === 'function') { try { tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(msg)); ok() } catch (e) { navigator.clipboard?.writeText(url + '\n' + msg); toast('Ссылка скопирована') } }
       else { navigator.clipboard?.writeText(url + '\n' + msg); toast('Ссылка скопирована') }
     }
     function copyRoomId() { haptic(); navigator.clipboard?.writeText(getDeepLink()); toast('Ссылка скопирована') }
@@ -1664,7 +1675,7 @@
 
       if (involvedInExp || involvedInColl) {
         const msg = "Нельзя удалить участника, который задействован в тратах или сборах. Сначала удалите связанные с ним чеки.";
-        if (tg && tg.showAlert) tg.showAlert(msg);
+        if (IS_TG && tg && typeof tg.showAlert === 'function') { try { tg.showAlert(msg) } catch (e) { alert(msg) } }
         else alert(msg);
         return;
       }
@@ -1886,11 +1897,6 @@
     const _goOrig = go;
     go = function (t, el) { _goOrig(t, el); if (t === 'poll') { pMode = 'plain'; $('mode-plain').classList.add('on'); $('mode-fund').classList.remove('on'); const fh = $('p-fundhint'); if (fh) fh.style.display = 'none'; pollOptsPriceVis(); initPollOpts() } };
     function initPollOpts() { const box = $('p-opts'); if (box && !box.children.length) { addPOpt(); addPOpt() } }
-    function confirmBox(msg, cb) {
-      if (tg && tg.showConfirm) tg.showConfirm(msg, ok => { if (ok) cb() });
-      else if (window.confirm) cb(window.confirm(msg));
-      else cb(true);
-    }
     function createPoll() {
       const q = $('p-q').value.trim();
       const rows = [...$('p-opts').children].map(r => { const t = r.querySelector('input[type=text]').value.trim(); const pr = parseFloat(r.querySelector('input[type=number]').value) || 0; return { t, pr } }).filter(x => x.t);
@@ -2035,8 +2041,10 @@
 
     /* ─── ОБЩЕЕ ─── */
     function confirmBox(msg, cb) {
-      if (tg && tg.showConfirm) tg.showConfirm(msg, ok => { if (ok) cb() });
-      else if (window.confirm) cb(window.confirm(msg));
+      if (IS_TG && tg && typeof tg.showConfirm === 'function') {
+        try { tg.showConfirm(msg, ok => { if (ok) cb() }); return } catch (e) { }
+      }
+      if (window.confirm) { try { cb(window.confirm(msg)) } catch (e) { cb(true) } }
       else cb(true);
     }
     function renderAll() {
